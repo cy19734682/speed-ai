@@ -1,0 +1,9 @@
+/src/assets
+/node_modules/**
+/dist*
+/public/*
+
+**/.git
+**/.svn
+**/.hg
+**/node_modules
