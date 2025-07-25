@@ -125,8 +125,8 @@ export async function getTools(params: McpTool) {
 		console.error('获取工具失败:', error)
 		throw error
 	} finally {
-    // await toolClient?.close()
-    // toolClient = null
+    await toolClient?.close()
+    toolClient = null
   }
 }
 

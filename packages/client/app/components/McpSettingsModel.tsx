@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { useMcpStore, useGeneralStore } from '@/app/store'
 import { McpTool } from '@/app/lib/type'
 import { UUID } from '@/app/lib/util'
-import { getTools } from '@/app/lib/mcp-service'
 import BodyPortal from '@/app/components/commons/BodyPortal'
 import { AddMarkIcon, CloseIcon } from '@/app/styles/SvgIcon'
+import { apiFetch } from '@/app/lib/api/fetch'
 
 const initialData = {
 	id: '',
@@ -107,7 +107,7 @@ export default function McpSettingsModel(): [false | JSX.Element] {
 			if (!mcpTool?.url?.trim()?.startsWith('http')) {
 				return setError('URL格式不正确')
 			}
-			if (!(tools.length > 0)) {
+			if (!(childTools.length > 0)) {
 				return setError('请先测试MCP连接是否可用！')
 			}
 			if (mcpTool.id === 'web_search') {
@@ -115,7 +115,7 @@ export default function McpSettingsModel(): [false | JSX.Element] {
 			} else if (mcpTool.id) {
 				updateTool(mcpTool.id, { ...mcpTool })
 			} else {
-				if (tools?.some((item: McpTool) => item?.code === mcpTool?.code)) {
+				if (childTools?.some((item: McpTool) => item?.code === mcpTool?.code)) {
 					return setError('MCP编码已存在！')
 				}
 				addTool({ ...mcpTool, id: UUID() })
@@ -139,7 +139,8 @@ export default function McpSettingsModel(): [false | JSX.Element] {
 				if (!mcpTool?.url?.trim()?.startsWith('http')) {
 					return setError('URL格式不正确')
 				}
-				const tool = await getTools(mcpTool)
+				const ret = await apiFetch('/api/tools', 'POST', { body: mcpTool })
+				const tool = await ret.json()
 				setChildTools(tool)
 			} catch (e: any) {
 				setError('连接错误：' + (e?.message || e))
@@ -162,11 +163,11 @@ export default function McpSettingsModel(): [false | JSX.Element] {
 								<CloseIcon />
 							</button>
 						</div>
+            {error && (
+              <div className="p-2 bg-red-50 text-sm text-red-600 rounded-lg">{error}</div>
+            )}
 						<div className="min-h-[400px] flex-1 overflow-auto px-2 flex flex-col items-center justify-between">
 							<div className="relative w-full pt-4 lg:pt-6 space-y-4">
-								{error && (
-									<div className="absolute top-0 w-full p-2 bg-red-50 text-sm text-red-600 rounded-lg">{error}</div>
-								)}
 								<label className="block">
 									<span className="block font-semibold mb-2">
 										<span className="text-red-500">*</span>编码
@@ -234,23 +235,23 @@ export default function McpSettingsModel(): [false | JSX.Element] {
 									/>
 								</label>
 							</div>
-							{childTools?.length > 0 && (
-								<div className="w-full mt-4">
-									<h2 className="text-lg font-semibold mb-2">工具列表</h2>
-									<div className="flex justify-start flex-wrap">
-										{childTools?.map?.((tool: McpTool, index: number) => (
-											<div
-												className="border border-blue-200 text-blue-600 rounded p-1 mr-2 mb-2 cursor-pointer"
-												key={'tool-' + index}
-												title={tool.description}
-											>
-												{tool.name}
-											</div>
-										))}
-									</div>
-								</div>
-							)}
 						</div>
+            {childTools?.length > 0 && (
+              <div className="w-full mt-4">
+                <h2 className="text-lg font-semibold mb-2">工具列表</h2>
+                <div className="flex justify-start flex-wrap">
+                  {childTools?.map?.((tool: McpTool, index: number) => (
+                    <div
+                      className="border border-blue-200 text-blue-600 rounded p-1 mr-2 mb-2 cursor-pointer"
+                      key={'tool-' + index}
+                      title={tool.description}
+                    >
+                      {tool.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 						<div className={`relative w-full mt-8 flex ${isDelete ? 'justify-between' : 'justify-end'}`}>
 							{isDelete && (
 								<button className="block px-2 rounded-lg text-sm btn-error" onClick={handleRemove}>
