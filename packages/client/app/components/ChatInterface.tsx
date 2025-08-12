@@ -1,14 +1,10 @@
 import React, { useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import rehypeHighlight from 'rehype-highlight'
-import remarkGfm from 'remark-gfm'
 import useChatContent from '@/app/hooks/useChatContent'
 import { ChatDetail } from '@/app/lib/type'
 import {
 	ThinkIcon,
 	ArrowDownIcon,
 	LoadingIcon,
-	CopyIcon,
 	ChatIcon,
 	ToTopIcon,
 	CloseIcon,
@@ -22,13 +18,15 @@ import {
 	SearchIcon,
 	ErrorIcon
 } from '@/app/styles/SvgIcon'
+import ChatReply from '@/app/components/commons/ChatReply'
 import { models } from '@/app/lib/constant'
-
+import { useToast } from '@/app/components/commons/Toast'
 /**
  * 对话主界面
  * @constructor
  */
 const ChatInterface: React.FC<any> = () => {
+	const toast = useToast()
 	const {
 		messagesTopRef,
 		messagesEndRef,
@@ -66,64 +64,6 @@ const ChatInterface: React.FC<any> = () => {
 		clearAssistantData
 	} = useChatContent()
 
-	/**
-	 * AI消息回复
-	 * @param chat
-	 * @constructor
-	 */
-	const MarkdownContent = ({ message }: { message: ChatDetail }) => {
-		return (
-			<div className="markdown-content">
-				<ReactMarkdown
-					remarkPlugins={[remarkGfm]}
-					rehypePlugins={[rehypeHighlight]}
-					components={{
-						// 自定义代码块渲染
-						code({ inline, className, children, ...props }: any) {
-							const match = /language-(\w+)/.exec(className || '')
-							return !inline && match ? (
-								<div className="code-block-wrapper">
-									<div className="code-block-header">
-										<span className="code-language">{match[1]}</span>
-										<button
-											onClick={() => navigator.clipboard.writeText(String(children).replace(/\n$/, ''))}
-											className="copy-button"
-											title="复制代码"
-										>
-											<CopyIcon />
-										</button>
-									</div>
-									<pre className={className}>
-										<code className={className} {...props}>
-											{children}
-										</code>
-									</pre>
-								</div>
-							) : (
-								<code className={className} {...props}>
-									{children}
-								</code>
-							)
-						}, // 自定义表格渲染
-						table({ ...props }: any) {
-							return (
-								<div className="table-container">
-									<table className="markdown-table" {...props} />
-								</div>
-							)
-						}, // 自定义链接渲染
-						a({ ...props }: any) {
-							return (
-								<a target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline" {...props} />
-							)
-						}
-					}}
-				>
-					{message.content}
-				</ReactMarkdown>
-			</div>
-		)
-	}
 
 	/**
 	 * AI思维链消息（深度思考）回复
@@ -338,7 +278,7 @@ const ChatInterface: React.FC<any> = () => {
 										{/*AI思维链消息回复*/}
 										<MarkdownThinkContent message={message} />
 										{/*AI消息回复*/}
-										<MarkdownContent message={message} />
+										<ChatReply content={message.content} isProcessing={isProcessing}  />
 									</div>
 								) : (
 									<div className="whitespace-pre-wrap">{message.content}</div>

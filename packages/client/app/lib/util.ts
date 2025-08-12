@@ -1,3 +1,4 @@
+import { PaginatedGroup ,MessagesGroup} from '@/app/lib/type'
 /**
  * 封装处理响应的公共方法
  * @param response
@@ -119,4 +120,120 @@ export function formatToolResult(result: any): string {
  */
 export function replyFormat(type: any, content: any = '') {
 	return JSON.stringify({ type, content }) + '\n\n'
+}
+
+/**
+ * 时间分组工具
+ * @param {Array} data - 原始数据数组
+ * @param {string} timeKey - 时间字段名
+ * @param {Object} pagination - 分页配置 { page: 当前页码, pageSize: 每页条数 }
+ * @returns {MessagesGroup} 分组结果和分页信息
+ */
+export function groupByTime(
+	data: any[],
+	timeKey: string,
+	pagination: { page: number; pageSize: number } = {
+		page: 1,
+		pageSize: 20
+	}
+): MessagesGroup {
+	const now = new Date()
+	const todayStart: any = new Date(now)
+	todayStart.setHours(0, 0, 0, 0)
+	const yesterdayStart = new Date(todayStart)
+	yesterdayStart.setDate(yesterdayStart.getDate() - 1)
+
+	// 定义分组边界
+	const timeGroups: Record<string, any> = {
+		today: {
+			name: '今日',
+			test: (d: any) => new Date(d) >= todayStart
+		},
+		yesterday: {
+			name: '昨日',
+			test: (d: any) => new Date(d) >= yesterdayStart && new Date(d) < todayStart
+		},
+		within7Days: {
+			name: '7天内',
+			test: (d: any) => {
+				const weekAgo = new Date(todayStart)
+				weekAgo.setDate(weekAgo.getDate() - 7)
+				return new Date(d) >= weekAgo && new Date(d) < yesterdayStart
+			}
+		},
+		within30Days: {
+			name: '30天内',
+			test: (d: any) => {
+				const monthAgo = new Date(todayStart)
+				monthAgo.setDate(monthAgo.getDate() - 30)
+				return new Date(d) >= monthAgo && new Date(d).getTime() < todayStart - 7 * 86400000
+			}
+		},
+		months: {}
+	}
+
+	// 分组处理
+	const groups: any = {}
+	data.forEach((item) => {
+		const date = new Date(item[timeKey])
+		for (const [key, group] of Object.entries(timeGroups)) {
+      if (key !== 'months' && group.test(date)) {
+				groups[key] = groups[key] || { name: group.name, data: [] }
+				groups[key].data.push(item)
+				return
+			}
+		}
+		// 按月分组
+		const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`
+		groups[monthKey] = groups[monthKey] || {
+			name: `${date.getFullYear()}年${date.getMonth() + 1}月`,
+			data: []
+		}
+		groups[monthKey].data.push(item)
+	})
+  
+  // 分组排序（今日->昨日->7天->30天->月份倒序）
+	const orderedGroups = [
+		groups.today,
+		groups.yesterday,
+		groups.within7Days,
+		groups.within30Days,
+		...Object.entries(groups)
+			.filter(([key]) => !['today', 'yesterday', 'within7Days', 'within30Days'].includes(key))
+			.sort(([a], [b]) => b.localeCompare(a)) // 月份倒序
+			.map(([, group]) => group)
+	].filter(Boolean)
+
+	// 分页处理
+	const startIndex = (pagination.page - 1) * pagination.pageSize
+	const paginatedGroups: PaginatedGroup[] = []
+	let remainingItems = pagination.pageSize
+	let currentPage = pagination.page
+
+	for (const group of orderedGroups) {
+		if (remainingItems <= 0) break
+
+		const groupStart = Math.max(0, startIndex - paginatedGroups.flatMap((g) => g.data).length)
+		const pageData = group.data.slice(groupStart, groupStart + remainingItems)
+		const hasMore = groupStart + remainingItems < group.data.length
+
+		if (pageData.length > 0) {
+			paginatedGroups.push({
+				name: group.name,
+				data: pageData,
+				total: group.data.length,
+				hasMore: hasMore,
+				currentPage: currentPage
+			})
+			remainingItems -= pageData.length
+		}
+	}
+
+	return {
+		groups: paginatedGroups,
+		total: data.length,
+		currentPage: pagination.page,
+		pageSize: pagination.pageSize,
+		hasNextPage: paginatedGroups.flatMap((g) => g.data).length < data.length - startIndex
+	}
 }

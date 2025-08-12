@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
-import { useChatStore } from '@/app/store/useChatStore'
-import {ChatMessages} from "@/app/lib/type"
+import { useChatStore } from '@/app/store'
+import {PaginatedGroup} from "@/app/lib/type"
+import {groupByTime} from "@/app/lib/util"
 
 export default function useChatList() {
 	const { messages, currentChatId, createCurrentChatId, updateCurrentChatId, removeMessage } =
 		useChatStore()
   
-  const [chatList, setChatList] = useState<ChatMessages[]>([])
+  const [chatGroups, setChatGroups] = useState<PaginatedGroup[]>([])
   
   useEffect(() => {
-    setChatList(messages)
+    const {groups} = groupByTime(messages, 'createdAt', { page: 1, pageSize: 1000 });
+    setChatGroups(groups)
   }, [messages])
   
 	/**
@@ -28,7 +30,7 @@ export default function useChatList() {
 
 	return {
     currentChatId,
-    chatList,
+    chatGroups,
     selectChat,
     removeMessage,
     handleNewMessage

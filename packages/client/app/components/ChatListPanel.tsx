@@ -1,16 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useGeneralStore } from '../store'
+import { useGeneralStore, useChatStore } from '../store'
 import useChatList from '../hooks/useChatList'
-import { ChatMessages, MenuItem } from '@/app/lib/type'
+import { ChatMessages, MenuItem, PaginatedGroup } from '@/app/lib/type'
 import { AddRoundIcon, ChatSettingIcon, McpIcon, PartnerIcon, RightMenuIcon } from '@/app/styles/SvgIcon'
+import { useConfirm } from '@/app/components/commons/Confirm'
+import { useToast } from '@/app/components/commons/Toast'
 
 /**
  * 历史对话列表
  * @constructor
  */
 const ChatListPanel: React.FC = () => {
+  const { confirm } = useConfirm()
+  const toast = useToast()
 	const { setIsModalSettingOpen, setIsModalMcpOpen, setIsModalAssistantOpen } = useGeneralStore()
-	const { chatList, currentChatId, selectChat, removeMessage, handleNewMessage } = useChatList()
+	const { updateMessageTitle } = useChatStore()
+	const { chatGroups, currentChatId, selectChat, removeMessage, handleNewMessage } = useChatList()
 
 	/**
 	 * 菜单项
@@ -20,9 +25,11 @@ const ChatListPanel: React.FC = () => {
 	 */
 	const ListItemMenu = ({ items, chat }: { items: MenuItem[]; chat: ChatMessages }) => {
 		const [isMenuOpen, setIsMenuOpen] = useState(false)
+		const [isEditing, setIsEditing] = useState(false)
+		const [editTitle, setEditTitle] = useState(chat.title)
 		const menuRef = useRef<HTMLDivElement>(null)
 		const buttonRef = useRef<HTMLButtonElement>(null)
-
+		const inputRef = useRef<HTMLInputElement>(null)
 		// 处理全局点击事件
 		useEffect(() => {
 			const handleClickOutside = (event: MouseEvent) => {
@@ -42,6 +49,13 @@ const ChatListPanel: React.FC = () => {
 			}
 		}, [])
 
+		// 编辑时自动聚焦
+		useEffect(() => {
+			if (isEditing && inputRef.current) {
+				inputRef.current.focus()
+			}
+		}, [isEditing])
+
 		// 获取菜单项样式
 		const getMenuItemStyle = (type = '') => {
 			const baseStyle = 'flex items-center w-full text-left px-4 py-2.5 text-sm transition-colors duration-200'
@@ -57,11 +71,48 @@ const ChatListPanel: React.FC = () => {
 			}
 		}
 
+		/**
+		 * 重命名标题
+		 */
+		const handleRename = () => {
+			if (editTitle.trim() !== '') {
+				updateMessageTitle(chat.chatId, editTitle)
+				setIsEditing(false)
+			}
+		}
+
+		/**
+		 * 监听键盘事件
+		 * @param e
+		 */
+		const handleKeyDown = (e: any) => {
+			if (e.key === 'Enter') {
+				handleRename()
+			} else if (e.key === 'Escape') {
+				setIsEditing(false)
+				setEditTitle(chat.title) // 恢复原来的标题
+			}
+		}
+
 		return (
 			<>
 				{/*标题*/}
-				<div className="font-medium flex-1 text-gray-900 truncate">{chat.title}</div>
-				<div className="relative inline-block">
+				<div className="text-sm flex-1 flex text-gray-900 truncate rounded-lg border border-transparent focus-within:border-blue-200">
+					{isEditing ? (
+						<input
+							ref={inputRef}
+							type="text"
+							value={editTitle}
+							onChange={(e) => setEditTitle(e.target.value)}
+							className="p-2 w-full focus:outline-none"
+							onBlur={handleRename}
+							onKeyDown={handleKeyDown}
+						/>
+					) : (
+						<span className="p-2">{chat.title}</span>
+					)}
+				</div>
+				<div className="relative inline-block pr-1">
 					{/* 菜单按钮 */}
 					<button
 						ref={buttonRef}
@@ -71,7 +122,7 @@ const ChatListPanel: React.FC = () => {
 						}}
 						className={`${
 							currentChatId === chat.chatId ? 'lg:visible' : 'lg:invisible'
-						} visible group-hover:visible hover:bg-gray-100`}
+						} visible group-hover:visible hover:bg-gray-100 rounded-lg p-1`}
 						aria-label="打开菜单"
 					>
 						<RightMenuIcon />
@@ -88,7 +139,20 @@ const ChatListPanel: React.FC = () => {
 									key={item.id}
 									onClick={(e) => {
 										e.stopPropagation()
-										item.action()
+										if (item?.action) {
+											item.action()
+										} else if (item.type === 'edit') {
+											setIsEditing(true)
+										} else if (item.type === 'delete') {
+											confirm({
+												title: '删除确认',
+												content: '您确定要删除此项吗？此操作不可撤销。',
+												submitConfirm: () => {
+													removeMessage(chat.chatId)
+													toast.success('删除成功')
+												}
+											})
+										}
 										setIsMenuOpen(false)
 									}}
 									className={getMenuItemStyle(item.type)}
@@ -109,38 +173,46 @@ const ChatListPanel: React.FC = () => {
 				<h2 className="text-xl font-semibold">AI 客户端</h2>
 			</div>
 			<div className="p-4 flex-1 overflow-hidden h-full">
-				{chatList.length === 0 ? (
+				{chatGroups.length === 0 ? (
 					''
 				) : (
 					<div className="space-y-3 h-full overflow-auto pr-1">
-						{chatList.map((chat: ChatMessages) => (
-							<div
-								key={chat.chatId}
-								className={`p-2 rounded-lg cursor-pointer transition-all duration-200 border ${
-									currentChatId === chat.chatId
-										? 'bg-blue-50 border-blue-200 shadow-sm'
-										: 'border-gray-100 hover:border-blue-100 hover:bg-blue-50'
-								}`}
-								onClick={() => {
-									selectChat(chat.chatId)
-									setIsModalSettingOpen(false)
-								}}
-							>
-								<div className="flex items-center group" title={chat.title}>
-									<ListItemMenu
-										chat={chat}
-										items={[
-											{
-												id: 1,
-												type: 'delete',
-												text: '删除',
-												action: () => {
-													removeMessage(chat.chatId)
-												}
+						{chatGroups.map((group: PaginatedGroup) => (
+							<div key={group.name}>
+								<div className="text-xs text-gray-400 font-medium pl-2 my-1">{group.name}</div>
+								{group.data.map((chat: ChatMessages) => (
+									<div
+										key={chat.chatId}
+										className={`rounded-lg cursor-pointer transition-all duration-200 ${
+											currentChatId === chat.chatId ? 'bg-blue-100 shadow-sm' : 'hover:bg-blue-50'
+										}`}
+										onClick={(e: any) => {
+											e.stopPropagation()
+											if (chat.chatId !== currentChatId) {
+												selectChat(chat.chatId)
+												setIsModalSettingOpen(false)
 											}
-										]}
-									/>
-								</div>
+										}}
+									>
+										<div className="flex items-center group" title={chat.title}>
+											<ListItemMenu
+												chat={chat}
+												items={[
+													{
+														id: 0,
+														type: 'edit',
+														text: '重命名'
+													},
+													{
+														id: 1,
+														type: 'delete',
+														text: '删除'
+													}
+												]}
+											/>
+										</div>
+									</div>
+								))}
 							</div>
 						))}
 					</div>

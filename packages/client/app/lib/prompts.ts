@@ -4,7 +4,7 @@
  */
 export function nameConversation(message: string) {
 	return `根据聊天记录，给这个对话起一个名字。
-          尽量简短——最多10个字符，不要加引号。
+          尽量简短 —— 最多20个字符，不要加引号。
           只提供名称，不提供其他内容。
           
           下面是对话：
@@ -13,7 +13,7 @@ export function nameConversation(message: string) {
             ${message}
             \`\`\`
             
-            用10个或更少的字符来命名这段对话。
+            用20个或更少的字符来命名这段对话。
             只说名字，别的什么都不要说。
             
             名字是：`.trim()

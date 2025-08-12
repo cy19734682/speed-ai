@@ -99,6 +99,21 @@ export const CopyIcon = ({ cls = 'h-4 w-4' }: { cls?: string }) => {
 }
 
 /**
+ * 默认用户头像
+ * @constructor
+ */
+export const OnlineRunIcon = ({ cls = 'h-4 w-4' }: { cls?: string }) => {
+  return (
+    <svg className={cls} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M12 22a9.661 9.661 0 0 1-3.882-.784 10.051 10.051 0 0 1-3.185-2.15 10.186 10.186 0 0 1-2.159-3.184A9.764 9.764 0 0 1 2 12c0-1.381.258-2.675.774-3.882a10.04 10.04 0 0 1 2.159-3.185 10.051 10.051 0 0 1 3.185-2.149A9.66 9.66 0 0 1 11.999 2a9.66 9.66 0 0 1 3.882.784 10.021 10.021 0 0 1 3.195 2.15 9.91 9.91 0 0 1 2.15 3.184c.522 1.207.783 2.5.783 3.882a9.661 9.661 0 0 1-.784 3.882 10.052 10.052 0 0 1-5.344 5.334A9.661 9.661 0 0 1 12 22zm-1.743-6.05l5.586-3.292a.732.732 0 0 0 .32-.397.749.749 0 0 0 0-.503.652.652 0 0 0-.32-.387L10.257 8.06a.866.866 0 0 0-.542-.126.76.76 0 0 0-.455.203c-.123.11-.184.265-.184.465v6.806c0 .2.061.361.184.484a.75.75 0 0 0 .445.203.948.948 0 0 0 .552-.145z"
+        fill="currentColor"
+      ></path>
+    </svg>
+  )
+}
+
+/**
  * 对话
  * @constructor
  */
@@ -321,7 +336,7 @@ export const SearchIcon = ({ cls }: { cls?: string }) => {
  * 右侧菜单
  * @constructor
  */
-export const RightMenuIcon = ({ cls = 'h-5 w-5' }: { cls?: string }) => {
+export const RightMenuIcon = ({ cls = 'h-4 w-4' }: { cls?: string }) => {
 	return (
 		<svg xmlns="http://www.w3.org/2000/svg" className={cls} viewBox="0 0 20 20" fill="currentColor">
 			<path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />

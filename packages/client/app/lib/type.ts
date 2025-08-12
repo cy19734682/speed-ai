@@ -58,6 +58,7 @@ export interface ChatSettingIcon {
   model: string
   temperature: number
   maxTokens: number
+  contextDeep: number
   [x: string]: any
 }
 
@@ -185,6 +186,26 @@ export type DeepSeekResponse = {
 export interface MenuItem {
 	id: number
 	text: string
-	action: () => void
-	type?: 'normal' | 'edit' | 'delete' // 增加类型，可选
+	action?: () => void
+	type: 'normal' | 'edit' | 'delete' // 增加类型，可选
+}
+
+
+
+// 列表分支
+export interface PaginatedGroup {
+  name: string,
+  data: ChatMessages [],
+  total: number,
+  hasMore: boolean,
+  currentPage: number
+}
+
+// 菜单类型
+export interface MessagesGroup {
+  groups: PaginatedGroup [],
+  total: number,
+  currentPage: number,
+  pageSize: number,
+  hasNextPage: boolean
 }

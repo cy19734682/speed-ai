@@ -11,7 +11,8 @@ const defaultState = {
 	setting: {
 		model: 'deepseek-chat',
 		temperature: 0.8,
-		maxTokens: 2048
+		maxTokens: 2048,
+    contextDeep: 5
 	},
 	messages: [],
 	currentChatId: null,
