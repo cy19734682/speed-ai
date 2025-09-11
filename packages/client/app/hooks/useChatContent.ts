@@ -4,8 +4,10 @@ import { handleResponse, UUID } from '@/app/lib/util'
 import { useChatStore, useMcpStore, useChatAssistantStore } from '@/app/store'
 import { Message, ChatMessages, McpTool, Assistant } from '@/app/lib/type'
 import {models} from "@/app/lib/constant"
+import { useToast } from '@/app/components/commons/Toast'
 
 export default function useChatContent() {
+  const toast = useToast()
 	const {
 		setting,
 		messages,
@@ -416,7 +418,7 @@ export default function useChatContent() {
 	 */
 	const toggleWenSearch = () => {
 		if (!searchTool?.enabled) {
-			return
+			return toast.warning('请先在MCP配置中启用联网搜索！')
 		}
 		setWebSearch(!webSearch)
 	}

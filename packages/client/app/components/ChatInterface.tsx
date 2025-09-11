@@ -20,13 +20,11 @@ import {
 } from '@/app/styles/SvgIcon'
 import ChatReply from '@/app/components/commons/ChatReply'
 import { models } from '@/app/lib/constant'
-import { useToast } from '@/app/components/commons/Toast'
 /**
  * 对话主界面
  * @constructor
  */
 const ChatInterface: React.FC<any> = () => {
-	const toast = useToast()
 	const {
 		messagesTopRef,
 		messagesEndRef,
