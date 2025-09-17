@@ -5,10 +5,11 @@ import { CopyIcon, OnlineRunIcon } from '@/app/styles/SvgIcon'
 import ReactMarkdown from 'react-markdown'
 import { useToast } from '@/app/components/commons/Toast'
 import Modal from '@/app/components/commons/Modal'
+import { copyTextToClipboard } from '@/app/lib/util'
 
 interface HTMLPreviewProps {
 	content: string
-  isProcessing: boolean
+	isProcessing: boolean
 }
 
 const ChatReply: React.FC<HTMLPreviewProps> = ({ content, isProcessing }) => {
@@ -37,9 +38,9 @@ const ChatReply: React.FC<HTMLPreviewProps> = ({ content, isProcessing }) => {
 	 * 复制代码
 	 * @param children
 	 */
-	const copyToClipboard = (children: any) => {
+	const copyToClipboard = async (children: any) => {
 		const codeText = extractTextContent(children).replace(/\n$/, '')
-		navigator.clipboard.writeText(codeText)
+		await copyTextToClipboard(codeText)
 		toast.success('复制成功')
 	}
 	/**
@@ -71,7 +72,7 @@ const ChatReply: React.FC<HTMLPreviewProps> = ({ content, isProcessing }) => {
 											}}
 											className="copy-button"
 											title="复制代码"
-                      disabled={isProcessing}
+											disabled={isProcessing}
 										>
 											<CopyIcon />
 											<span className="text-xs pl-1">复制</span>
@@ -83,7 +84,7 @@ const ChatReply: React.FC<HTMLPreviewProps> = ({ content, isProcessing }) => {
 												}}
 												className="copy-button ml-2"
 												title="在线运行"
-                        disabled={isProcessing}
+												disabled={isProcessing}
 											>
 												<OnlineRunIcon />
 												<span className="text-xs pl-1">运行</span>
@@ -119,7 +120,7 @@ const ChatReply: React.FC<HTMLPreviewProps> = ({ content, isProcessing }) => {
 			</ReactMarkdown>
 			<Modal title="网页预览" isOpen={!!htmlBlock} onClose={() => setHtmlBlock('')} className="w-[1200px]">
 				<div className="relative w-full h-[60vh] lg:h-[70vh]">
-					<iframe ref={iframeRef}  srcDoc={htmlBlock} className="w-full h-full border-0" />
+					<iframe ref={iframeRef} srcDoc={htmlBlock} className="w-full h-full border-0" />
 				</div>
 			</Modal>
 		</div>
