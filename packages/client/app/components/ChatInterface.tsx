@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import useChatContent from '@/app/hooks/useChatContent'
-import { ChatDetail } from '@/app/lib/type'
+import { ChatDetail, ChatRoundDetail } from '@/app/lib/type'
 import {
 	ThinkIcon,
 	ArrowDownIcon,
@@ -35,6 +35,7 @@ const ChatInterface: React.FC<any> = () => {
 		inputValue,
 		isProcessing,
 		webSearch,
+		thinking,
 		toolsRef,
 		selectedModel,
 		isToolsOpen,
@@ -54,6 +55,7 @@ const ChatInterface: React.FC<any> = () => {
 		scrollToTop,
 		scrollToBottom,
 		toggleWenSearch,
+		toggleThinking,
 		selectModel,
 		setIsToolsOpen,
 		disEnableAllTools,
@@ -62,17 +64,16 @@ const ChatInterface: React.FC<any> = () => {
 		clearAssistantData
 	} = useChatContent()
 
-
 	/**
 	 * AI思维链消息（深度思考）回复
 	 * @param chat
 	 * @constructor
 	 */
-	const MarkdownThinkContent = ({ message }: { message: ChatDetail }) => {
+	const MarkdownThinkContent = ({ message }: { message: ChatRoundDetail }) => {
 		// 是否正在思考
-		const isThinking = message.thinkContent && !message.content
+		const isThinking = message.think && !message.time
 		// 是否思考结束
-		const isThinkEnd = message.thinkContent && message.content
+		const isThinkEnd = message.think && message.time
 
 		const [isOpen, setIsOpen] = useState(true)
 
@@ -91,7 +92,7 @@ const ChatInterface: React.FC<any> = () => {
 						>
 							<ThinkIcon cls="mr-1" />
 							{isThinking && '正在思考...'}
-							{isThinkEnd && `已深度思考（用时${message.thinkTime || 0}秒）`}
+							{isThinkEnd && `已深度思考（用时${message.time || 0}秒）`}
 							{isThinkEnd && (
 								<div className={`ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`}>
 									<ArrowDownIcon />
@@ -101,7 +102,7 @@ const ChatInterface: React.FC<any> = () => {
 						<div
 							className={`text-sm px-3 my-3 text-[#8b8b8b] whitespace-pre-wrap border-l-2 ${isOpen ? 'block' : 'hidden'}`}
 						>
-							{message.thinkContent}
+							{message.think}
 						</div>
 					</div>
 				)}
@@ -114,9 +115,9 @@ const ChatInterface: React.FC<any> = () => {
 	 * @param chat
 	 * @constructor
 	 */
-	const WebSearchContent = ({ message }: { message: ChatDetail }) => {
+	const WebSearchContent = ({ message }: { message: ChatRoundDetail }) => {
 		// 联网搜索结果
-		const { type, toolName, searchQuery, content }: any = message.searchData || {}
+		const { type, toolName, params, result }: any = message.search || {}
 		const [isOpen, setIsOpen] = useState(false)
 		return (
 			<>
@@ -140,12 +141,12 @@ const ChatInterface: React.FC<any> = () => {
 						</div>
 						<div className={`flex items-center text-xs pl-2 mt-2 ${isOpen ? 'block' : 'hidden'}`}>
 							搜索关键字：
-							<span className="text-gray-600 font-bold italic">{searchQuery?.query || ''}</span>
+							<span className="text-gray-600 font-bold italic">{params?.query || ''}</span>
 						</div>
 						<div
 							className={`py-2 flex scroll-smooth gap-2 transition-all duration-300 ${isOpen ? 'flex-wrap overflow-x-hidden' : 'flex-nowrap overflow-x-auto'}`}
 						>
-							{content?.map((item: any, index: number) => (
+							{result?.map((item: any, index: number) => (
 								<div
 									key={item.title}
 									className={`flex-shrink-0 ${isOpen ? 'w-[170px]' : 'w-40'} h-14 bg-gray-100 rounded-xl p-2 flex flex-col justify-between`}
@@ -177,7 +178,7 @@ const ChatInterface: React.FC<any> = () => {
 	 * @param chat
 	 * @constructor
 	 */
-	const McpToolContent = ({ message }: { message: ChatDetail }) => {
+	const McpToolContent = ({ message }: { message: ChatRoundDetail }) => {
 		// 联网搜索结果
 		const tools: any[] = message.tools || []
 
@@ -261,23 +262,32 @@ const ChatInterface: React.FC<any> = () => {
 								}
 							>
 								{message.role === 'assistant' ? (
-									<div>
-										{/*联网搜索*/}
-										<WebSearchContent message={message} />
-										{/*MCP工具调用*/}
-										<McpToolContent message={message} />
-										{!message.thinkContent && !message.content ? ( //未返回结果时显示加载动画
-											<div className="ml-2 inline-block">
-												<LoadingIcon cls="h-4 w-4" />
+									message?.contents?.length > 0 ? (
+										message?.contents?.map?.((item: ChatRoundDetail, index1: number) => (
+											<div key={message.chatId + index + index1}>
+												{/*AI思维链消息回复*/}
+												<MarkdownThinkContent message={item} />
+												{/*AI消息回复*/}
+												<ChatReply content={item.middle} isProcessing={isProcessing} />
+												{/*联网搜索*/}
+												<WebSearchContent message={item} />
+												{/*MCP工具调用*/}
+												<McpToolContent message={item} />
+												{/*工具加载中*/}
+												{item?.loading ? (
+													<div className="ml-2 inline-block">
+														<LoadingIcon cls="h-4 w-4" />
+													</div>
+												) : (
+													''
+												)}
 											</div>
-										) : (
-											''
-										)}
-										{/*AI思维链消息回复*/}
-										<MarkdownThinkContent message={message} />
-										{/*AI消息回复*/}
-										<ChatReply content={message.content} isProcessing={isProcessing}  />
-									</div>
+										))
+									) : (
+										<div className="ml-2 inline-block">
+											<LoadingIcon cls="h-4 w-4" />
+										</div>
+									)
 								) : (
 									<div className="whitespace-pre-wrap">{message.content}</div>
 								)}
@@ -408,6 +418,23 @@ const ChatInterface: React.FC<any> = () => {
 										</div>
 									)}
 								</div>
+
+								{/* 思考模式按钮 - 图标 */}
+								<button
+									disabled={!!currentModel.isThink}
+									onClick={toggleThinking}
+									className={`flex items-center justify-center w-9 h-9 rounded-lg border transition-colors
+									 ${!!currentModel.isThink ? 'cursor-not-allowed' : ''}
+									 ${
+											thinking
+												? 'bg-gradient-to-r from-blue-100 to-indigo-100 border-blue-300 text-blue-600'
+												: 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-50'
+										}`}
+									aria-label={thinking ? '关闭思考模式' : '开启思考模式'}
+									title={thinking ? '关闭思考模式' : '开启思考模式'}
+								>
+									<ThinkIcon width={20} height={20} />
+								</button>
 
 								{/* 联网搜索按钮 - 图标 */}
 								<button

@@ -62,20 +62,27 @@ export interface ChatSettingIcon {
   [x: string]: any
 }
 
+// 多轮对话详情
+export interface ChatRoundDetail {
+	middle: string
+	think?: string
+	time?: string
+	search?: {
+		type: string
+		toolName: string
+		content: any[]
+	}
+	tools?: any[]
+	[x: string]: any
+}
+
 // 对话详情
 export interface ChatDetail {
 	chatId: string
 	role: 'user' | 'assistant' | 'system'
 	createdAt: string
 	content: string
-	thinkContent?: string
-	thinkTime?: string
-	searchData?: {
-    type: string,
-    toolName: string,
-    content: any[]
-  }
-	tools?: any[]
+	contents: ChatRoundDetail[]
 	[x: string]: any
 }
 
@@ -98,6 +105,7 @@ export interface McpTool {
 	tag: string
   description: string
 	accessToken: string
+	tool: string
   enabled: boolean
 	[x: string]: any
 }

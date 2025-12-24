@@ -74,20 +74,5 @@ export function answerWithSearchResults(): string {
  */
 export function structureToolAction() {
 	const currentDate = new Date().toLocaleDateString()
-	return `
-      作为一个函数调用检测器，您的主要目标是充分理解用户输入的信息，来判断是否需要调用工具，记住今天的日期：${currentDate}。请严格遵循以下规则：
-      1. 当用户请求未传入tool参数时，直接返回空字符串：
-      2. 仅当触发函数调用时返回以下格式，其他情况返回空字符串：
-      {
-        "tool_calls": [
-          {
-            "name": "函数名",
-            "arguments": {
-              "参数1": "值1",
-              "参数2": "值2"
-            }
-          }
-        ]
-      }
-`.trim()
+	return `作为一个函数调用检测器，您的主要目标是充分理解用户输入的信息，来判断是否需要调用工具，记住今天的日期：${currentDate}。`.trim()
 }

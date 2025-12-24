@@ -6,7 +6,8 @@ import { AddMarkIcon } from '@/app/styles/SvgIcon'
 import { apiFetch } from '@/app/lib/api/fetch'
 import Modal from '@/app/components/commons/Modal'
 import { useToast } from '@/app/components/commons/Toast'
-import {useConfirm} from "@/app/components/commons/Confirm"
+import { useConfirm } from '@/app/components/commons/Confirm'
+import { WEB_SEARCH_KEY } from '@/app/lib/constant'
 
 const initialData = {
 	id: '',
@@ -16,6 +17,7 @@ const initialData = {
 	tag: '',
 	description: '',
 	accessToken: '',
+	tool: '',
 	enabled: false
 }
 
@@ -25,7 +27,7 @@ const initialData = {
  */
 const McpSettingsModel: React.FC<any> = () => {
 	const toast = useToast()
-  const { confirm } = useConfirm()
+	const { confirm } = useConfirm()
 	const { isModalMcpOpen, setIsModalMcpOpen } = useGeneralStore()
 	const { tools, searchTool, addTool, removeTool, updateTool, updateSearchTool } = useMcpStore()
 
@@ -60,12 +62,15 @@ const McpSettingsModel: React.FC<any> = () => {
 		const [mcpTool, setMcpTool] = useState<McpTool>(item)
 		const [childTools, setChildTools] = useState<any[]>([])
 		const [testLoading, setTestLoading] = useState<boolean>(false)
-		const isDelete = mcpTool?.id && mcpTool?.id !== 'web_search'
+		const isDelete = mcpTool?.id && mcpTool?.id !== WEB_SEARCH_KEY
 		const toolListRef = useRef<HTMLDivElement>(null)
 
 		useEffect(() => {
-			setMcpTool(item)
-		}, [item])
+			if (item && isOpen) {
+				setMcpTool(item)
+				setChildTools([])
+			}
+		}, [item, isOpen])
 
 		// 表单输入赋值
 		const handleChange = (name: string, value: any) => {
@@ -92,14 +97,15 @@ const McpSettingsModel: React.FC<any> = () => {
 			if (!(childTools.length > 0)) {
 				return toast.warning('请先测试MCP连接是否可用！')
 			}
-			if (mcpTool.id === 'web_search') {
+			mcpTool.tool = childTools?.map((e: McpTool) => e?.name)?.join(',') || ''
+			if (mcpTool.id === WEB_SEARCH_KEY) {
 				updateSearchTool({ ...mcpTool, id: searchTool.id })
 				toast.success('编辑成功')
 			} else if (mcpTool.id) {
 				updateTool(mcpTool.id, { ...mcpTool })
 				toast.success('编辑成功')
 			} else {
-				if (childTools?.some((e: McpTool) => e?.code === mcpTool?.code)) {
+				if (mcpList?.some((e: McpTool) => e?.code === mcpTool?.code)) {
 					return toast.error('MCP编码已存在！')
 				}
 				addTool({ ...mcpTool, id: UUID() })
@@ -110,15 +116,15 @@ const McpSettingsModel: React.FC<any> = () => {
 
 		// 删除操作
 		const handleRemove = () => {
-      confirm({
-        title: '删除确认',
-        content: '您确定要删除此工具吗？此操作不可撤销。',
-        submitConfirm: () => {
-          removeTool(mcpTool.id)
-          onClose()
-          toast.success('删除成功')
-        }
-      })
+			confirm({
+				title: '删除确认',
+				content: '您确定要删除此工具吗？此操作不可撤销。',
+				submitConfirm: () => {
+					removeTool(mcpTool.id)
+					onClose()
+					toast.success('删除成功')
+				}
+			})
 		}
 
 		// 测试操作

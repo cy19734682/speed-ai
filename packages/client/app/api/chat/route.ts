@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {createDeepSeekChat, createDeepSeekChatStream} from '@/app/lib/api/deepseek'
+import { createDeepSeekChat } from '@/app/lib/api/deepseek'
 
 export async function POST(req: NextRequest) {
 	try {
 		const { messages, options = {} } = await req.json()
-    // 使用封装的DeepSeek服务获取流
+		const controller = new AbortController()
+		req.signal.addEventListener('abort', () => controller.abort())
+		// 使用封装的DeepSeek服务获取流
 		const stream = await createDeepSeekChat(messages, {
-			...options
+			...options,
+			abortCtrl: controller
 		})
 		// 创建响应
 		return new NextResponse(stream, {

@@ -1,4 +1,4 @@
-import { PaginatedGroup ,MessagesGroup} from '@/app/lib/type'
+import { PaginatedGroup, MessagesGroup } from '@/app/lib/type'
 /**
  * 封装处理响应的公共方法
  * @param response
@@ -13,24 +13,89 @@ export const handleResponse = async (response: any, onMessages: (arg0: any) => v
 	// 处理流式响应
 	const reader = response.body.getReader()
 	const decoder = new TextDecoder('utf-8')
-	while (true) {
-		const { value, done } = await reader.read()
-		if (done) break
-		const chunk = decoder.decode(value, { stream: true })
-		const lines = chunk.split('\n\n').filter((line) => line.trim() !== '')
-		for (const line of lines) {
-			if (line) {
+	try {
+		while (true) {
+			const { value, done } = await reader.read()
+			if (done) break
+			const chunk = decoder.decode(value, { stream: true })
+			const lines = chunk.split('\n\n').filter((line) => line.trim() !== '')
+			for (const line of lines) {
+				if (!line.trim()) continue
 				try {
 					const data = JSON.parse(line)
-					// 更新内容
-					if (data) {
+					// 把回调也包起来，防止“设置 undefined”导致整个流被 abort
+					try {
 						onMessages(data)
+					} catch (cbErr: any) {
+						console.error('回调处理失败:', cbErr)
 					}
-				} catch (err: any) {
-					throw new Error(`解析错误: ${err.message}`)
+				} catch (parseErr: any) {
+					console.warn('JSON 解析失败:', line, parseErr)
 				}
 			}
 		}
+	} catch (readerErr: any) {
+		//  AbortController 主动取消会走到这里
+		if (readerErr.name === 'AbortError') {
+			console.log('~~~请求被主动取消~~~~')
+			return
+		}
+		// 其他 reader 异常继续抛，让外层 finally 处理
+		throw readerErr
+	} finally {
+		reader.releaseLock()
+	}
+}
+
+/**
+ * 处理DeepSeek流式响应
+ * @param response
+ * @param onMessages
+ */
+export const handleDeepseekResponse = async (response: any, onMessages: (arg0: any) => void) => {
+	if (!response.ok) {
+		const errorData = await response.json()
+		// 直接返回错误信息，避免本地抛出异常
+		throw new Error(errorData.error?.message || `请求失败: ${response.status}`)
+	}
+	// 处理流式响应
+	const reader = response.body.getReader()
+	const decoder = new TextDecoder('utf-8')
+	try {
+		while (true) {
+			const { value, done } = await reader.read()
+			if (done) break
+			const chunk = decoder.decode(value, { stream: true })
+			const lines = chunk.split('\n').filter((line) => line.trim() !== '')
+			for (const line of lines) {
+				if (!line.trim()) continue
+				if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+					const dataStr = line.substring(6)
+					try {
+						const processedData = JSON.parse(dataStr)
+						// 把回调也包起来，防止“设置 undefined”导致整个流被 abort
+						try {
+							const delta = processedData.choices[0]?.delta
+							onMessages(delta)
+						} catch (cbErr: any) {
+							console.error('回调处理失败:', cbErr)
+						}
+					} catch (parseErr: any) {
+						console.warn('JSON 解析失败:', line, parseErr)
+					}
+				}
+			}
+		}
+	} catch (readerErr: any) {
+		//  AbortController 主动取消会走到这里
+		if (readerErr.name === 'AbortError') {
+			console.log('~~~DeepSeek请求被主动取消~~~~')
+			return
+		}
+		// 其他 reader 异常继续抛，让外层 finally 处理
+		throw readerErr
+	} finally {
+		reader.releaseLock()
 	}
 }
 
@@ -116,10 +181,10 @@ export function formatToolResult(result: any): string {
 /**
  * 消息回复格式化
  * @param type
- * @param content
+ * @param result
  */
-export function replyFormat(type: any, content: any = '') {
-	return JSON.stringify({ type, content }) + '\n\n'
+export function replyFormat(type: any, result: any = '') {
+	return JSON.stringify({ type, result }) + '\n\n'
 }
 
 /**
@@ -177,7 +242,7 @@ export function groupByTime(
 	data.forEach((item) => {
 		const date = new Date(item[timeKey])
 		for (const [key, group] of Object.entries(timeGroups)) {
-      if (key !== 'months' && group.test(date)) {
+			if (key !== 'months' && group.test(date)) {
 				groups[key] = groups[key] || { name: group.name, data: [] }
 				groups[key].data.push(item)
 				return
@@ -191,8 +256,8 @@ export function groupByTime(
 		}
 		groups[monthKey].data.push(item)
 	})
-  
-  // 分组排序（今日->昨日->7天->30天->月份倒序）
+
+	// 分组排序（今日->昨日->7天->30天->月份倒序）
 	const orderedGroups = [
 		groups.today,
 		groups.yesterday,
@@ -238,30 +303,27 @@ export function groupByTime(
 	}
 }
 
-
 /**
  * 格式化工具调用结果
  */
 export async function copyTextToClipboard(text: string): Promise<void> {
-  
-  const fallbackCopyTextToClipboard = (text: string): void => {
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textArea);
-  };
-  
-  if (!navigator.clipboard) {
-    fallbackCopyTextToClipboard(text);
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(text);
-  }
-  catch (err) {
-    console.error('Clipboard write failed:', err);
-    fallbackCopyTextToClipboard(text);
-  }
+	const fallbackCopyTextToClipboard = (text: string): void => {
+		const textArea = document.createElement('textarea')
+		textArea.value = text
+		document.body.appendChild(textArea)
+		textArea.select()
+		document.execCommand('copy')
+		document.body.removeChild(textArea)
+	}
+
+	if (!navigator.clipboard) {
+		fallbackCopyTextToClipboard(text)
+		return
+	}
+	try {
+		await navigator.clipboard.writeText(text)
+	} catch (err) {
+		console.error('Clipboard write failed:', err)
+		fallbackCopyTextToClipboard(text)
+	}
 }

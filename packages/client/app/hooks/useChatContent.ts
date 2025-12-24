@@ -3,11 +3,11 @@ import { apiFetch } from '@/app/lib/api/fetch'
 import { handleResponse, UUID } from '@/app/lib/util'
 import { useChatStore, useMcpStore, useChatAssistantStore } from '@/app/store'
 import { Message, ChatMessages, McpTool, Assistant } from '@/app/lib/type'
-import {models} from "@/app/lib/constant"
+import { models } from '@/app/lib/constant'
 import { useToast } from '@/app/components/commons/Toast'
 
 export default function useChatContent() {
-  const toast = useToast()
+	const toast = useToast()
 	const {
 		setting,
 		messages,
@@ -21,7 +21,7 @@ export default function useChatContent() {
 		updateMessageTitle,
 		updateCurrentRoleId
 	} = useChatStore()
-	const { tools, searchTool, updateTool,updateAllTool } = useMcpStore()
+	const { tools, searchTool, updateTool, updateAllTool } = useMcpStore()
 	const { assistants } = useChatAssistantStore()
 
 	const [inputValue, setInputValue] = useState('')
@@ -29,6 +29,7 @@ export default function useChatContent() {
 	const [error, setError] = useState<string | null>(null)
 	const [chatData, setChatData] = useState<ChatMessages | null>(null)
 	const [webSearch, setWebSearch] = useState<boolean>(false)
+	const [thinking, setThinking] = useState<boolean>(false)
 	const [selectedModel, setSelectedModel] = useState<string>('deepseek-chat')
 	const [isToolsOpen, setIsToolsOpen] = useState<boolean>(false)
 	const [isModelMenuOpen, setIsModelMenuOpen] = useState<boolean>(false)
@@ -131,8 +132,17 @@ export default function useChatContent() {
 	 * 当前模型对象
 	 */
 	const currentModel: any = useMemo(() => {
-    return models.find((item) => item.value === selectedModel) || {}
+		return models.find((item) => item.value === selectedModel) || {}
 	}, [selectedModel])
+
+	/**
+	 * 判断当前模式是否本身支持思考，支持则设置thinking为true
+	 */
+	useEffect(() => {
+		if (currentModel?.isThink) {
+			setThinking(true)
+		}
+	}, [currentModel])
 
 	/**
 	 * 初始化时判断是否存在当前聊天ID，不存在则创建
@@ -260,7 +270,7 @@ export default function useChatContent() {
 			}
 			const message = {
 				role: 'user',
-				content: `USER: ${userContent} \n\nAssistant: ${assistantContent.slice(0, 400)} \n\n`
+				content: `USER: ${userContent} \n\nAssistant: ${assistantContent?.slice(0, 400)} \n\n`
 			}
 			// 将消息发送到 API
 			const response: any = await apiFetch('/api/chat', 'POST', {
@@ -277,8 +287,9 @@ export default function useChatContent() {
 			})
 			let lineBuffer = ''
 			await handleResponse(response, (data: any) => {
-				if (data.content) {
-					lineBuffer += data.content
+				if (data.result) {
+					const { content } = data.result
+					lineBuffer += content
 					updateMessageTitle(chat.chatId, lineBuffer)
 				}
 			})
@@ -339,15 +350,16 @@ export default function useChatContent() {
 				chatId: UUID(),
 				role: 'assistant',
 				createdAt: new Date().toISOString(),
-				content: ''
+				contents: []
 			})
 		}
-    // 开始对话后去掉所选择的助手
-    clearAssistantData()
+		// 开始对话后去掉所选择的助手
+		clearAssistantData()
 		// 直接访问 store 实例 获取最新状态
 		const chat = useChatStore.getState().messages?.find?.((item: ChatMessages) => item.chatId === currentChatId) || null
 		let lineBuffer = ''
 		let lineThinkBuffer = ''
+		const messageList: any[] = []
 		try {
 			const history = chat?.list?.slice?.(0, -1).map?.((e: Message) => ({ role: e.role, content: e.content })) || []
 			abortControllerRef.current = new AbortController()
@@ -360,6 +372,7 @@ export default function useChatContent() {
 					options: {
 						webSearch,
 						searchTool,
+						thinking,
 						tools: mcpList.filter((item: McpTool) => item.enabled),
 						model: setting.model,
 						temperature: setting.temperature,
@@ -368,30 +381,39 @@ export default function useChatContent() {
 				}
 			})
 			await handleResponse(response, (data: any) => {
-				if (data.content) {
-					if (data.type === 'think') {
-						// 深度思考内容
-						lineThinkBuffer += data.content
-						updateMessageChild(chat.chatId, { thinkContent: lineThinkBuffer })
-					} else if (data.type === 'time') {
-						// 深度思考时间
-						updateMessageChild(chat.chatId, { thinkTime: data.content })
-					} else if (data.type === 'search') {
-						// 联网搜索结果
-						updateMessageChild(chat.chatId, { searchData: data.content })
-					} else if (data.type === 'tool') {
-						// 工具调用结果
-						updateMessageChild(chat.chatId, { tools: data.content })
-					} else {
-						// 普通对话
-						lineBuffer += data.content
-						updateMessageChild(chat.chatId, { content: lineBuffer })
+				if (data?.result) {
+					const { index, content } = data?.result
+					if (index === messageList?.length) {
+						lineThinkBuffer = ''
+						lineBuffer = ''
+						messageList.push({})
 					}
+					/**
+					 * type 类型
+					 * 普通对话：middle
+					 * 深度思考：think
+					 * 思考时间：time
+					 * 联网搜索结果：search
+					 * 工具调用结果：tools
+					 */
+					if (data.type === 'think') {
+						lineThinkBuffer += content
+						messageList[index][data.type] = lineThinkBuffer
+					} else if (data.type === 'middle') {
+						lineBuffer += content
+						messageList[index][data.type] = lineBuffer
+						// 将AI正式回答写入缓存，方便后续使用
+						updateMessageChild(chat.chatId, { content: lineBuffer })
+					} else {
+						messageList[index][data.type] = content
+					}
+					updateMessageChild(chat.chatId, { contents: messageList })
 				}
 			})
 		} catch (error: any) {
 			setError(error.message)
-			updateMessageChild(chat.chatId, { content: lineBuffer + `\n\n⚠️ =====异常结束=====` })
+			messageList[messageList.length - 1].content = lineBuffer + `\n\n⚠️ =====异常结束=====`
+			updateMessageChild(chat.chatId, { contents: messageList })
 		} finally {
 			//请求结束
 			setIsProcessing(false)
@@ -424,6 +446,13 @@ export default function useChatContent() {
 	}
 
 	/**
+	 * 切换思考模式状态
+	 */
+	const toggleThinking = () => {
+		setThinking(!thinking)
+	}
+
+	/**
 	 * 选择模型
 	 */
 	const selectModel = (model: string) => {
@@ -434,7 +463,7 @@ export default function useChatContent() {
 	 * 全选或取消所有工具
 	 */
 	const disEnableAllTools = (enabled: boolean) => {
-    updateAllTool(mcpList.map((tool) => ({ ...tool, enabled })))
+		updateAllTool(mcpList.map((tool) => ({ ...tool, enabled })))
 	}
 
 	/**
@@ -455,6 +484,7 @@ export default function useChatContent() {
 		scrollBottomButtonRef,
 		setting,
 		webSearch,
+		thinking,
 		toolsRef,
 		selectedModel,
 		isToolsOpen,
@@ -466,7 +496,7 @@ export default function useChatContent() {
 		toolsButtonRef,
 		textareaRef,
 		assistantData,
-    currentModel,
+		currentModel,
 		setInputValue,
 		setIsProcessing,
 		setError,
@@ -475,6 +505,7 @@ export default function useChatContent() {
 		scrollToTop,
 		scrollToBottom,
 		toggleWenSearch,
+		toggleThinking,
 		selectModel,
 		setIsToolsOpen,
 		disEnableAllTools,

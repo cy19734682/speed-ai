@@ -32,3 +32,9 @@ export const models = [
 		description: '推理模型，复杂问题解决'
 	}
 ]
+
+
+/**
+ * 联网搜索工具的存储键名
+ */
+export const WEB_SEARCH_KEY = 'web_search'

@@ -1,20 +1,21 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { McpStore, McpTool } from '@/app/lib/type'
-import { MCP_STORE_KEY } from '@/app/lib/constant'
+import { MCP_STORE_KEY, WEB_SEARCH_KEY } from '@/app/lib/constant'
 
 /**
  * 定义默认的状态
  **/
 const defaultState = {
 	searchTool: {
-		id: 'web_search',
-    code: 'web_search',
+		id: WEB_SEARCH_KEY,
+    code: WEB_SEARCH_KEY,
     name: '联网搜索',
     url: '',
     tag: '联网',
     description: '',
     accessToken: '',
+		tool: '',
     enabled: false
 	},
 	tools: []

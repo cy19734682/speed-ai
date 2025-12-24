@@ -1,16 +1,16 @@
-import dotenv from "dotenv";
-dotenv.config();
+import dotenv from 'dotenv'
+dotenv.config()
 
 // 配置接口定义
 export interface Config {
-  ai: {
-    // DeepSeek API 密钥
-    deepseekApiKey: string;
-    // DeepSeek API 地址
-    deepseekApiUrl: string;
-    // 默认模型
-    defaultModel: string;
-  };
+	ai: {
+		// DeepSeek API 密钥
+		deepseekApiKey: string
+		// DeepSeek API 地址
+		deepseekApiUrl: string
+		// 默认模型
+		defaultModel: string
+	}
 }
 
 // 全局配置对象
