@@ -119,20 +119,24 @@ async function handleReGeocode(location: string) {
 	url.searchParams.append('location', location)
 	url.searchParams.append('key', AMAP_MAPS_API_KEY)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `RGeocoding failed: ${data.info || data.infocode}`
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `RGeocoding failed: ${data.info || data.infocode}`
+		}
+		return JSON.stringify(
+			{
+				provice: data?.regeocode?.addressComponent?.province,
+				city: data?.regeocode?.addressComponent?.city,
+				district: data?.regeocode?.addressComponent?.district
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `RGeocoding failed: ${e.message}`
 	}
-	return JSON.stringify(
-		{
-			provice: data?.regeocode?.addressComponent?.province,
-			city: data?.regeocode?.addressComponent?.city,
-			district: data?.regeocode?.addressComponent?.district
-		},
-		null,
-		2
-	)
 }
 
 /**
@@ -145,34 +149,38 @@ async function handleGeo(address: string, city?: string) {
 	url.searchParams.append('key', AMAP_MAPS_API_KEY)
 	url.searchParams.append('address', address)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `Geocoding failed: ${data.info || data.infocode}`
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `Geocoding failed: ${data.info || data.infocode}`
+		}
+		const geocodes = data.geocodes || []
+		const res =
+			geocodes.length > 0
+				? geocodes.map((geo: Record<string, any>) => ({
+						country: geo.country,
+						province: geo.province,
+						city: geo.city,
+						citycode: geo.citycode,
+						district: geo.district,
+						street: geo.street,
+						number: geo.number,
+						adcode: geo.adcode,
+						location: geo.location,
+						level: geo.level
+					}))
+				: []
+		return JSON.stringify(
+			{
+				return: res
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `Geocoding failed: ${e.message}`
 	}
-	const geocodes = data.geocodes || []
-	const res =
-		geocodes.length > 0
-			? geocodes.map((geo: Record<string, any>) => ({
-					country: geo.country,
-					province: geo.province,
-					city: geo.city,
-					citycode: geo.citycode,
-					district: geo.district,
-					street: geo.street,
-					number: geo.number,
-					adcode: geo.adcode,
-					location: geo.location,
-					level: geo.level
-				}))
-			: []
-	return JSON.stringify(
-		{
-			return: res
-		},
-		null,
-		2
-	)
 }
 
 /**
@@ -184,21 +192,25 @@ async function handleIPLocation(ip: string) {
 	url.searchParams.append('ip', ip)
 	url.searchParams.append('key', AMAP_MAPS_API_KEY)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `IP Location failed: ${data.info || data.infocode}`
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `IP Location failed: ${data.info || data.infocode}`
+		}
+		return JSON.stringify(
+			{
+				province: data?.province,
+				city: data?.city,
+				adcode: data?.adcode,
+				rectangle: data?.rectangle
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `IP Location failed: ${e.message}`
 	}
-	return JSON.stringify(
-		{
-			province: data?.province,
-			city: data?.city,
-			adcode: data?.adcode,
-			rectangle: data?.rectangle
-		},
-		null,
-		2
-	)
 }
 
 /**
@@ -211,19 +223,23 @@ async function handleWeather(city: string) {
 	url.searchParams.append('key', AMAP_MAPS_API_KEY)
 	url.searchParams.append('source', 'ts_mcp')
 	url.searchParams.append('extensions', 'all')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `Get weather failed: ${data.info || data.infocode}`
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `Get weather failed: ${data.info || data.infocode}`
+		}
+		return JSON.stringify(
+			{
+				city: data?.forecasts?.[0]?.city,
+				forecasts: data?.forecasts?.[0]?.casts
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `Get weather failed: ${e.message}`
 	}
-	return JSON.stringify(
-		{
-			city: data?.forecasts?.[0]?.city,
-			forecasts: data?.forecasts?.[0]?.casts
-		},
-		null,
-		2
-	)
 }
 
 /**
@@ -235,27 +251,31 @@ async function handleSearchDetail(id: string) {
 	url.searchParams.append('id', id)
 	url.searchParams.append('key', AMAP_MAPS_API_KEY)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `Get poi detail failed: ${data.info || data.infocode}`
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `Get poi detail failed: ${data.info || data.infocode}`
+		}
+		let poi = data.pois?.[0] || {}
+		return JSON.stringify(
+			{
+				id: poi.id,
+				name: poi.name,
+				location: poi.location,
+				address: poi.address,
+				business_area: poi.business_area,
+				city: poi.cityname,
+				type: poi.type,
+				alias: poi.alias,
+				...poi.biz_ext
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `Get poi detail failed: ${e.message}`
 	}
-	let poi = data.pois?.[0] || {}
-	return JSON.stringify(
-		{
-			id: poi.id,
-			name: poi.name,
-			location: poi.location,
-			address: poi.address,
-			business_area: poi.business_area,
-			city: poi.cityname,
-			type: poi.type,
-			alias: poi.alias,
-			...poi.biz_ext
-		},
-		null,
-		2
-	)
 }
 
 /**
@@ -269,36 +289,40 @@ async function handleBicycling(origin: string, destination: string) {
 	url.searchParams.append('origin', origin)
 	url.searchParams.append('destination', destination)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.errcode !== 0) {
-		return `Direction bicycling failed: ${data.info || data.infocode}`
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.errcode !== 0) {
+			return `Direction bicycling failed: ${data.info || data.infocode}`
+		}
+		return JSON.stringify(
+			{
+				data: {
+					origin: data?.data?.origin,
+					destination: data?.data?.destination,
+					paths: data?.data?.paths?.map?.((path: Record<string, any>) => {
+						return {
+							distance: path.distance,
+							duration: path.duration,
+							steps: path.steps.map((step: Record<string, any>) => {
+								return {
+									instruction: step.instruction,
+									road: step.road,
+									distance: step.distance,
+									orientation: step.orientation,
+									duration: step.duration
+								}
+							})
+						}
+					})
+				}
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `Bicycling failed: ${e.message}`
 	}
-	return JSON.stringify(
-		{
-			data: {
-				origin: data?.data?.origin,
-				destination: data?.data?.destination,
-				paths: data?.data?.paths?.map?.((path: Record<string, any>) => {
-					return {
-						distance: path.distance,
-						duration: path.duration,
-						steps: path.steps.map((step: Record<string, any>) => {
-							return {
-								instruction: step.instruction,
-								road: step.road,
-								distance: step.distance,
-								orientation: step.orientation,
-								duration: step.duration
-							}
-						})
-					}
-				})
-			}
-		},
-		null,
-		2
-	)
 }
 
 /**
@@ -312,36 +336,40 @@ async function handleWalking(origin: string, destination: string) {
 	url.searchParams.append('origin', origin)
 	url.searchParams.append('destination', destination)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `Direction Walking failed: ${data.info || data.infocode}`
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `Direction Walking failed: ${data.info || data.infocode}`
+		}
+		return JSON.stringify(
+			{
+				route: {
+					origin: data?.route?.origin,
+					destination: data?.route?.destination,
+					paths: data?.route?.paths?.map?.((path: Record<string, any>) => {
+						return {
+							distance: path.distance,
+							duration: path.duration,
+							steps: path.steps.map((step: Record<string, any>) => {
+								return {
+									instruction: step.instruction,
+									road: step.road,
+									distance: step.distance,
+									orientation: step.orientation,
+									duration: step.duration
+								}
+							})
+						}
+					})
+				}
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `Direction Walking failed: ${e.message}`
 	}
-	return JSON.stringify(
-		{
-			route: {
-				origin: data?.route?.origin,
-				destination: data?.route?.destination,
-				paths: data?.route?.paths?.map?.((path: Record<string, any>) => {
-					return {
-						distance: path.distance,
-						duration: path.duration,
-						steps: path.steps.map((step: Record<string, any>) => {
-							return {
-								instruction: step.instruction,
-								road: step.road,
-								distance: step.distance,
-								orientation: step.orientation,
-								duration: step.duration
-							}
-						})
-					}
-				})
-			}
-		},
-		null,
-		2
-	)
 }
 
 /**
@@ -355,37 +383,41 @@ async function handleDriving(origin: string, destination: string) {
 	url.searchParams.append('origin', origin)
 	url.searchParams.append('destination', destination)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `Direction Driving failed: ${data.info || data.infocode}`
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `Direction Driving failed: ${data.info || data.infocode}`
+		}
+		return JSON.stringify(
+			{
+				route: {
+					origin: data?.route?.origin,
+					destination: data?.route?.destination,
+					paths: data?.route?.paths?.map?.((path: Record<string, any>) => {
+						return {
+							path: path.path,
+							distance: path.distance,
+							duration: path.duration,
+							steps: path.steps.map((step: Record<string, any>) => {
+								return {
+									instruction: step.instruction,
+									road: step.road,
+									distance: step.distance,
+									orientation: step.orientation,
+									duration: step.duration
+								}
+							})
+						}
+					})
+				}
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `Direction Driving failed: ${e.message}`
 	}
-	return JSON.stringify(
-		{
-			route: {
-				origin: data?.route?.origin,
-				destination: data?.route?.destination,
-				paths: data?.route?.paths?.map?.((path: Record<string, any>) => {
-					return {
-						path: path.path,
-						distance: path.distance,
-						duration: path.duration,
-						steps: path.steps.map((step: Record<string, any>) => {
-							return {
-								instruction: step.instruction,
-								road: step.road,
-								distance: step.distance,
-								orientation: step.orientation,
-								duration: step.duration
-							}
-						})
-					}
-				})
-			}
-		},
-		null,
-		2
-	)
 }
 
 /**
@@ -403,89 +435,93 @@ async function handleTransitIntegrated(origin: string, destination: string, city
 	url.searchParams.append('city', city)
 	url.searchParams.append('cityd', cityd)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `Direction Transit Integrated failed: ${data.info || data.infocode}`
-	}
-	return JSON.stringify(
-		{
-			route: {
-				origin: data?.route?.origin,
-				destination: data?.route?.destination,
-				distance: data?.route?.distance,
-				transits: data?.route?.transits
-					? data?.route?.transits.map?.((transit: Record<string, any>) => {
-							return {
-								duration: transit?.duration,
-								walking_distance: transit?.walking_distance,
-								segments: transit.segments
-									? transit.segments.map((segment: Record<string, any>) => {
-											return {
-												walking: {
-													origin: segment.walking.origin,
-													destination: segment.walking.destination,
-													distance: segment.walking.distance,
-													duration: segment.walking.duration,
-													steps:
-														segment.walking && segment.walking.steps
-															? segment.walking.steps.map((step: Record<string, any>) => {
-																	return {
-																		instruction: step.instruction,
-																		road: step.road,
-																		distance: step.distance,
-																		action: step.action,
-																		assistant_action: step.assistant_action
-																	}
-																})
-															: []
-												},
-												bus: {
-													buslines:
-														segment.bus && segment.bus.buslines
-															? segment.bus.buslines.map((busline: Record<string, any>) => {
-																	return {
-																		name: busline.name,
-																		departure_stop: {
-																			name: busline.departure_stop.name
-																		},
-																		arrival_stop: {
-																			name: busline.arrival_stop.name
-																		},
-																		distance: busline.distance,
-																		duration: busline.duration,
-																		via_stops: busline.via_stops
-																			? busline.via_stops.map((via_stop: Record<string, any>) => {
-																					return {
-																						name: via_stop.name
-																					}
-																				})
-																			: []
-																	}
-																})
-															: []
-												},
-												entrance: {
-													name: segment.entrance.name
-												},
-												exit: {
-													name: segment.exit.name
-												},
-												railway: {
-													name: segment.railway.name,
-													trip: segment.railway.trip
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `Direction Transit Integrated failed: ${data.info || data.infocode}`
+		}
+		return JSON.stringify(
+			{
+				route: {
+					origin: data?.route?.origin,
+					destination: data?.route?.destination,
+					distance: data?.route?.distance,
+					transits: data?.route?.transits
+						? data?.route?.transits.map?.((transit: Record<string, any>) => {
+								return {
+									duration: transit?.duration,
+									walking_distance: transit?.walking_distance,
+									segments: transit.segments
+										? transit.segments.map((segment: Record<string, any>) => {
+												return {
+													walking: {
+														origin: segment.walking.origin,
+														destination: segment.walking.destination,
+														distance: segment.walking.distance,
+														duration: segment.walking.duration,
+														steps:
+															segment.walking && segment.walking.steps
+																? segment.walking.steps.map((step: Record<string, any>) => {
+																		return {
+																			instruction: step.instruction,
+																			road: step.road,
+																			distance: step.distance,
+																			action: step.action,
+																			assistant_action: step.assistant_action
+																		}
+																	})
+																: []
+													},
+													bus: {
+														buslines:
+															segment.bus && segment.bus.buslines
+																? segment.bus.buslines.map((busline: Record<string, any>) => {
+																		return {
+																			name: busline.name,
+																			departure_stop: {
+																				name: busline.departure_stop.name
+																			},
+																			arrival_stop: {
+																				name: busline.arrival_stop.name
+																			},
+																			distance: busline.distance,
+																			duration: busline.duration,
+																			via_stops: busline.via_stops
+																				? busline.via_stops.map((via_stop: Record<string, any>) => {
+																						return {
+																							name: via_stop.name
+																						}
+																					})
+																				: []
+																		}
+																	})
+																: []
+													},
+													entrance: {
+														name: segment.entrance.name
+													},
+													exit: {
+														name: segment.exit.name
+													},
+													railway: {
+														name: segment.railway.name,
+														trip: segment.railway.trip
+													}
 												}
-											}
-										})
-									: []
-							}
-						})
-					: []
-			}
-		},
-		null,
-		2
-	)
+											})
+										: []
+								}
+							})
+						: []
+				}
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `Direction Transit Integrated failed: ${e.message}` //
+	}
 }
 
 /**
@@ -501,25 +537,30 @@ async function handleDistance(origins: string, destination: string, type = '1') 
 	url.searchParams.append('destination', destination)
 	url.searchParams.append('type', type)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `Direction Distance failed: ${data.info || data.infocode}`
+
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `Direction Distance failed: ${data.info || data.infocode}`
+		}
+		return JSON.stringify(
+			{
+				results: data?.results?.map?.((result: Record<string, any>) => {
+					return {
+						origin_id: result.origin_id,
+						dest_id: result.dest_id,
+						distance: result.distance,
+						duration: result.duration
+					}
+				})
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `Direction Distance failed: ${e.message}`
 	}
-	return JSON.stringify(
-		{
-			results: data?.results?.map?.((result: Record<string, any>) => {
-				return {
-					origin_id: result.origin_id,
-					dest_id: result.dest_id,
-					distance: result.distance,
-					duration: result.duration
-				}
-			})
-		},
-		null,
-		2
-	)
 }
 
 /**
@@ -535,37 +576,41 @@ async function handleTextSearch(keywords: string, city = '', citylimit = 'false'
 	url.searchParams.append('city', city)
 	url.searchParams.append('citylimit', citylimit)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `Text Search failed: ${data.info || data.infocode}`
-	}
-	let resciytes =
-		data.suggestion && data.suggestion.ciytes
-			? data.suggestion.ciytes.map((city: Record<string, any>) => {
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `Text Search failed: ${data.info || data.infocode}`
+		}
+		let resciytes =
+			data.suggestion && data.suggestion.ciytes
+				? data.suggestion.ciytes.map((city: Record<string, any>) => {
+						return {
+							name: city.name
+						}
+					})
+				: []
+		return JSON.stringify(
+			{
+				suggestion: {
+					keywords: data?.suggestion?.keywords,
+					ciytes: resciytes
+				},
+				pois: data?.pois?.map((poi: Record<string, any>) => {
 					return {
-						name: city.name
+						id: poi.id,
+						name: poi.name,
+						address: poi.address,
+						typecode: poi.typecode
 					}
 				})
-			: []
-	return JSON.stringify(
-		{
-			suggestion: {
-				keywords: data?.suggestion?.keywords,
-				ciytes: resciytes
 			},
-			pois: data?.pois?.map((poi: Record<string, any>) => {
-				return {
-					id: poi.id,
-					name: poi.name,
-					address: poi.address,
-					typecode: poi.typecode
-				}
-			})
-		},
-		null,
-		2
-	)
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `Text Search failed: ${e.message}`
+	}
 }
 
 /**
@@ -581,25 +626,29 @@ async function handleAroundSearch(location: string, radius = '1000', keywords = 
 	url.searchParams.append('radius', radius)
 	url.searchParams.append('keywords', keywords)
 	url.searchParams.append('source', 'ts_mcp')
-	const response = await fetch(url.toString())
-	const data = await response.json()
-	if (data.status !== '1') {
-		return `Around Search failed: ${data.info || data.infocode}`
+	try {
+		const response = await fetch(url.toString())
+		const data = await response.json()
+		if (data.status !== '1') {
+			return `Around Search failed: ${data.info || data.infocode}`
+		}
+		return JSON.stringify(
+			{
+				pois: data?.pois?.map((poi: Record<string, any>) => {
+					return {
+						id: poi.id,
+						name: poi.name,
+						address: poi.address,
+						typecode: poi.typecode
+					}
+				})
+			},
+			null,
+			2
+		)
+	} catch (e: any) {
+		return `Around Search failed: ${e.message}`
 	}
-	return JSON.stringify(
-		{
-			pois: data?.pois?.map((poi: Record<string, any>) => {
-				return {
-					id: poi.id,
-					name: poi.name,
-					address: poi.address,
-					typecode: poi.typecode
-				}
-			})
-		},
-		null,
-		2
-	)
 }
 
 const MAPS_TOOLS = [

@@ -40,23 +40,27 @@ export async function handleBingSearch(query: string) {
 	}
 	const config = SEARCH_ENGINES['bing']
 	const searchUrl = config.url + encodeURIComponent(query) + `&_=${new Date().getTime()}`
-	const response = await fetch(searchUrl, { headers })
-	if (!response.ok) {
-		throw new Error(`HTTP 错误! 状态码: ${response.status}`)
-	}
-	const html = await response.text()
-  // 使用 Cheerio 解析 HTML
-	const $ = cheerio.load(html)
-  const retData: { title: string; link: string; snippet: string }[] = []
-	// 提取数据
-	$(config.selector.results).each((index, element) => {
-    const title = $(element).find(config.selector.title)?.text()?.trim()
-		const link = $(element).find(config.selector.link)?.attr('href')
-		const snippet = $(element).find(config.selector.desc)?.text()?.trim()
-		if (title && link) {
-			retData.push({ title, link, snippet })
+	const retData: { title: string; link: string; snippet: string }[] = []
+	try {
+		const response = await fetch(searchUrl, { headers })
+		if (!response.ok) {
+			throw new Error(`HTTP 错误! 状态码: ${response.status}`)
 		}
-	})
+		const html = await response.text()
+		// 使用 Cheerio 解析 HTML
+		const $ = cheerio.load(html)
+		// 提取数据
+		$(config.selector.results).each((index, element) => {
+			const title = $(element).find(config.selector.title)?.text()?.trim()
+			const link = $(element).find(config.selector.link)?.attr('href')
+			const snippet = $(element).find(config.selector.desc)?.text()?.trim()
+			if (title && link) {
+				retData.push({ title, link, snippet })
+			}
+		})
+	}	catch (e: any) {
+		retData.push({ title: '搜索失败', link: '', snippet: e.message })
+	}
   return retData
 }
 
