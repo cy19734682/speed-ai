@@ -50,6 +50,7 @@ const ChatInterface: React.FC<any> = () => {
 		currentModel,
 		setInputValue,
 		setError,
+		handleKeyDown ,
 		handleSendMessage,
 		handleCancel,
 		scrollToTop,
@@ -355,7 +356,7 @@ const ChatInterface: React.FC<any> = () => {
 								ref={textareaRef}
 								value={inputValue}
 								onChange={(e) => setInputValue(e.target.value)}
-								onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+								onKeyDown={handleKeyDown}
 								placeholder="输入消息..."
 								className="w-full focus:outline-none resize-none bg-transparent min-h-16 max-h-32"
 								rows={1}

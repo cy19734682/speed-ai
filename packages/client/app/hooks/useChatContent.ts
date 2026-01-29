@@ -297,6 +297,26 @@ export default function useChatContent() {
 			setError('自动生成标题失败：' + error.message)
 		}
 	}
+	
+	/**
+	 * 处理键盘事件
+	 * @param e
+	 */
+	const handleKeyDown = async (e: any) => {
+		// 忽略输入法编辑状态（中文输入时不触发）
+		if (e.nativeEvent.isComposing) {
+			return
+		}
+		if (e.key === 'Enter') {
+			// Shift + Enter：换行，不阻止默认行为
+			if (e.shiftKey) {
+				return // 浏览器自动插入换行符
+			}
+			// 纯 Enter：发送消息
+			e.preventDefault() // 阻止默认换行
+			await handleSendMessage()
+		}
+	}
 
 	/**
 	 * 处理发送消息
@@ -500,6 +520,7 @@ export default function useChatContent() {
 		setInputValue,
 		setIsProcessing,
 		setError,
+		handleKeyDown,
 		handleSendMessage,
 		handleCancel,
 		scrollToTop,
