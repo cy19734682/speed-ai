@@ -38,7 +38,7 @@ const handlerSearchResult = async (
 				],
 				{
 					...options,
-					model: 'deepseek-chat',
+					model: config.ai.defaultModel,
 					tools: undefined
 				}
 			)
@@ -116,7 +116,7 @@ const handlerMcpToolResult = async (
 				],
 				{
 					...options,
-					model: 'deepseek-chat',
+					model: config.ai.defaultModel,
 					tools: formatMcpSchemaTool(funcTools)
 				}
 			)
@@ -172,7 +172,7 @@ const handlerMcpToolResult = async (
 const autoGenerateTitle = async (messages: any, options: Record<string, any> = {}): Promise<any> => {
 	const { autoTitle } = options
 	if (autoTitle) {
-		options.model = 'deepseek-chat'
+		options.model = config.ai.defaultModel
 		messages[0].content = nameConversation(messages[0].content)
 	}
 }

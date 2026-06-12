@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { apiFetch } from '@/app/lib/api/fetch'
-import { handleResponse, UUID } from '@/app/lib/util'
+import { handleResponse } from '@/app/lib/util'
 import { useChatStore, useMcpStore, useChatAssistantStore } from '@/app/store'
-import { Message, ChatMessages, McpTool, Assistant } from '@/app/lib/type'
+import { ChatMessages, ChatDetail, McpTool, Assistant } from '@/app/lib/type'
 import { models } from '@/app/lib/constant'
 import { useToast } from '@/app/components/commons/Toast'
 
@@ -11,15 +11,18 @@ export default function useChatContent() {
 	const {
 		setting,
 		messages,
+		historys,
+		currentChatData,
 		currentChatId,
 		currentRoleId,
 		updateSetting,
-		createCurrentChatId,
 		addMessage,
 		addMessageChild,
 		updateMessageChild,
+		saveMessageChild,
 		updateMessageTitle,
-		updateCurrentRoleId
+		updateCurrentRoleId,
+		loadMessages
 	} = useChatStore()
 	const { tools, searchTool, updateTool, updateAllTool } = useMcpStore()
 	const { assistants } = useChatAssistantStore()
@@ -27,10 +30,9 @@ export default function useChatContent() {
 	const [inputValue, setInputValue] = useState('')
 	const [isProcessing, setIsProcessing] = useState(false)
 	const [error, setError] = useState<string | null>(null)
-	const [chatData, setChatData] = useState<ChatMessages | null>(null)
 	const [webSearch, setWebSearch] = useState<boolean>(false)
 	const [thinking, setThinking] = useState<boolean>(false)
-	const [selectedModel, setSelectedModel] = useState<string>('deepseek-chat')
+	const [selectedModel, setSelectedModel] = useState<string>(models[0]?.value || '')
 	const [isToolsOpen, setIsToolsOpen] = useState<boolean>(false)
 	const [isModelMenuOpen, setIsModelMenuOpen] = useState<boolean>(false)
 	const [mcpList, setMcpList] = useState<McpTool[]>([])
@@ -56,16 +58,11 @@ export default function useChatContent() {
 	const textareaRef = useRef<HTMLTextAreaElement>(null)
 
 	/**
-	 * 当前对话ID和对话列表变化时更新聊天数据
+	 * 初始化时加载对话消息
 	 */
 	useEffect(() => {
-		const chat = messages?.find?.((item: ChatMessages) => item.chatId === currentChatId) || null
-		if (chat) {
-			setChatData(chat)
-		} else {
-			setChatData(null)
-		}
-	}, [messages, currentChatId])
+		loadMessages()
+	}, [])
 
 	/**
 	 * 当前角色ID变化时新建会话并将AI助手加入对话中
@@ -84,7 +81,9 @@ export default function useChatContent() {
 	 */
 	useEffect(() => {
 		const chat = useChatStore.getState().messages?.find?.((item: ChatMessages) => item.chatId === currentChatId) || null
-		const isNeedGenerateTitle = chat?.list?.some?.((item: ChatMessages) => item.role === 'assistant' && item.createdAt)
+		const isNeedGenerateTitle = useChatStore
+			.getState()
+			.historys?.some?.((item: ChatDetail) => item.role === 'assistant' && item.createdAt)
 		if (!isProcessing && isNeedGenerateTitle && !chat?.isAutoTitle) {
 			autoGenerateTitle().then()
 		}
@@ -143,15 +142,6 @@ export default function useChatContent() {
 			setThinking(true)
 		}
 	}, [currentModel])
-
-	/**
-	 * 初始化时判断是否存在当前聊天ID，不存在则创建
-	 */
-	useEffect(() => {
-		if (!messages?.some((item: ChatMessages) => item.chatId === currentChatId)) {
-			createCurrentChatId()
-		}
-	}, [])
 
 	/**
 	 * 消息变化时滚动到底部并保存消息
@@ -262,9 +252,12 @@ export default function useChatContent() {
 	const autoGenerateTitle = async () => {
 		// 直接访问 store 实例 获取最新状态
 		const chat = useChatStore.getState().messages?.find?.((item: ChatMessages) => item.chatId === currentChatId) || null
+		let lineBuffer = ''
 		try {
-			const userContent = chat.list.find((item: ChatMessages) => item.role === 'user')?.content
-			const assistantContent = chat.list.find((item: ChatMessages) => item.role === 'assistant')?.content
+			const userContent = useChatStore.getState().historys?.find((item: ChatDetail) => item.role === 'user')?.content
+			const assistantContent = useChatStore
+				.getState()
+				.historys.find((item: ChatDetail) => item.role === 'assistant')?.content
 			if (!userContent || !assistantContent) {
 				return
 			}
@@ -285,7 +278,6 @@ export default function useChatContent() {
 					}
 				}
 			})
-			let lineBuffer = ''
 			await handleResponse(response, (data: any) => {
 				if (data.result) {
 					const { content } = data.result
@@ -295,9 +287,11 @@ export default function useChatContent() {
 			})
 		} catch (error: any) {
 			setError('自动生成标题失败：' + error.message)
+		} finally {
+			updateMessageTitle(chat.chatId, lineBuffer, true)
 		}
 	}
-	
+
 	/**
 	 * 处理键盘事件
 	 * @param e
@@ -326,62 +320,48 @@ export default function useChatContent() {
 		const userMessage = inputValue.trim()
 		setInputValue('')
 		setIsProcessing(true)
+		const msgList: any[] = [
+			{
+				role: 'user',
+				createdAt: new Date().toISOString(),
+				content: userMessage
+			},
+			{
+				role: 'assistant',
+				createdAt: '',
+				content: '',
+				contents: []
+			}
+		]
 		// 新消息
 		if (isNewChat) {
-			const msgList: any[] = [
-				{
-					chatId: UUID(),
-					role: 'user',
-					createdAt: new Date().toISOString(),
-					content: userMessage
-				},
-				{
-					chatId: UUID(),
-					role: 'assistant',
-					createdAt: '',
-					content: ''
-				}
-			]
+			const newMessage: ChatMessages = {
+				chatId: currentChatId,
+				createdAt: new Date().toISOString(),
+				title: userMessage,
+				isAutoTitle: false
+			}
+			addMessage(newMessage)
 			if (assistantData) {
 				// 拼接助手提示
 				msgList.unshift({
-					chatId: UUID(),
 					role: 'system',
 					createdAt: new Date().toISOString(),
 					content: assistantData.prompt
 				})
 			}
-			const newMessage: ChatMessages = {
-				chatId: currentChatId,
-				createdAt: new Date().toISOString(),
-				title: userMessage,
-				isAutoTitle: false,
-				list: msgList
-			}
-			addMessage(newMessage)
-		} else {
-			addMessageChild(currentChatId, {
-				chatId: UUID(),
-				role: 'user',
-				createdAt: new Date().toISOString(),
-				content: userMessage
-			})
-			addMessageChild(currentChatId, {
-				chatId: UUID(),
-				role: 'assistant',
-				createdAt: new Date().toISOString(),
-				contents: []
-			})
 		}
+		msgList.forEach((item: any) => {
+			addMessageChild(item)
+		})
 		// 开始对话后去掉所选择的助手
 		clearAssistantData()
-		// 直接访问 store 实例 获取最新状态
-		const chat = useChatStore.getState().messages?.find?.((item: ChatMessages) => item.chatId === currentChatId) || null
 		let lineBuffer = ''
 		let lineThinkBuffer = ''
 		const messageList: any[] = []
+		const chatHistorys: ChatDetail[] = useChatStore.getState().historys?.slice?.(0, -1) || []
 		try {
-			const history = chat?.list?.slice?.(0, -1).map?.((e: Message) => ({ role: e.role, content: e.content })) || []
+			const history = chatHistorys.map?.((e: ChatDetail) => ({ role: e.role, content: e.content })) || []
 			abortControllerRef.current = new AbortController()
 			// 将消息发送到 API
 			const response: any = await apiFetch('/api/chat', 'POST', {
@@ -423,21 +403,28 @@ export default function useChatContent() {
 						lineBuffer += content
 						messageList[index][data.type] = lineBuffer
 						// 将AI正式回答写入缓存，方便后续使用
-						updateMessageChild(chat.chatId, { content: lineBuffer })
+						updateMessageChild({ content: lineBuffer })
 					} else {
 						messageList[index][data.type] = content
 					}
-					updateMessageChild(chat.chatId, { contents: messageList })
+					updateMessageChild({ contents: messageList })
 				}
 			})
 		} catch (error: any) {
 			setError(error.message)
-			messageList[messageList.length - 1].content = lineBuffer + `\n\n⚠️ =====异常结束=====`
-			updateMessageChild(chat.chatId, { contents: messageList })
+			if (messageList?.length === 0) {
+				messageList.push({})
+			}
+			const errorContent = lineBuffer + `\n\n⚠️ =====异常结束=====`
+			messageList[messageList.length - 1].middle = errorContent
+			updateMessageChild({ contents: messageList, content: errorContent })
 		} finally {
 			//请求结束
 			setIsProcessing(false)
-			updateMessageChild(chat.chatId, { createdAt: new Date().toISOString() })
+			const lastMessage: any = { createdAt: new Date().toISOString() }
+			updateMessageChild(lastMessage)
+			// 保存子消息持久化
+			saveMessageChild(currentChatId, lastMessage)
 		}
 	}
 
@@ -490,13 +477,14 @@ export default function useChatContent() {
 	 * 清除助手数据
 	 */
 	const clearAssistantData = () => {
-		updateCurrentRoleId(null)
+		updateCurrentRoleId('')
 	}
 
 	return {
 		messagesTopRef,
 		messagesEndRef,
-		chatData,
+		currentChatData,
+		historys,
 		error,
 		inputValue,
 		isProcessing,

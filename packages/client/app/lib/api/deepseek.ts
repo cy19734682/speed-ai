@@ -12,7 +12,7 @@ import { nameConversation, structureToolAction } from '@/app/lib/prompts'
 const autoGenerateTitle = async (messages: any, options: Record<string, any> = {}): Promise<any> => {
 	const { autoTitle } = options
 	if (autoTitle) {
-		options.model = 'deepseek-chat'
+		options.model = config.ai.defaultModel
 		options.thinking = false
 		messages[0].content = nameConversation(messages[0].content)
 	}
@@ -55,12 +55,9 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 		})
 	}
 
-	// 处理轮次
-	let round = 0
-
-	// 处理DeepSeek API调用
-	while (true) {
-		const response: any = await apiFetch(config.ai.deepseekApiUrl, 'POST', {
+	// 创建DeepSeek模型
+	const createChatModel = async () => {
+		return await apiFetch(config.ai.deepseekApiUrl, 'POST', {
 			body: {
 				model: model || config.ai.defaultModel,
 				messages,
@@ -76,6 +73,14 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 			controller: abortCtrl,
 			timeout: 30000 // 30秒超时
 		})
+	}
+
+	// 处理轮次
+	let round = 0
+
+	// 处理DeepSeek API调用
+	while (true) {
+		const response: any = await createChatModel()
 		let thinkTime = 0 // 思考时间
 		let startTime: any = null // 开始时间
 		let isThinking = false // 是否输出了深度思考
@@ -100,7 +105,7 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 				// 计算思考时间
 				if (isThinking && !thinkTime) {
 					thinkTime = (Date.now() - startTime) / 1000
-					controller.enqueue(replyFormat('time', { index: round, content: Number(thinkTime.toFixed(0)) }))
+					controller.enqueue(replyFormat('time', { index: round, content: Number(thinkTime.toFixed(4)) }))
 				}
 				assistantMsg.content += content
 				// 正常对话
@@ -111,7 +116,7 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 				// 计算思考时间
 				if (isThinking && !thinkTime) {
 					thinkTime = (Date.now() - startTime) / 1000
-					controller.enqueue(replyFormat('time', { index: round, content: Number(thinkTime.toFixed(0)) }))
+					controller.enqueue(replyFormat('time', { index: round, content: Number(thinkTime.toFixed(4)) }))
 				}
 				// 向前端输入开始加载状态
 				if (!isLoading) {

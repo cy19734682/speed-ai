@@ -27,10 +27,10 @@ export const handleResponse = async (response: any, onMessages: (arg0: any) => v
 					try {
 						onMessages(data)
 					} catch (cbErr: any) {
-						console.error('回调处理失败:', cbErr)
+						console.error('API接口回调处理失败:', cbErr)
 					}
 				} catch (parseErr: any) {
-					console.warn('JSON 解析失败:', line, parseErr)
+					console.warn('API接口JSON 解析失败:', line, parseErr)
 				}
 			}
 		}
@@ -49,6 +49,7 @@ export const handleResponse = async (response: any, onMessages: (arg0: any) => v
 
 /**
  * 处理DeepSeek流式响应
+ * 使用行级缓冲 + SSE 事件缓冲，防止 JSON 被数据块边界截断
  * @param response
  * @param onMessages
  */
@@ -61,33 +62,57 @@ export const handleDeepseekResponse = async (response: any, onMessages: (arg0: a
 	// 处理流式响应
 	const reader = response.body.getReader()
 	const decoder = new TextDecoder('utf-8')
+	// 行级缓冲区：存放跨数据块的未完整行
+	let lineBuffer = ''
+	// SSE 事件缓冲区：多条 data: 行拼接成一个完整事件内容（SSE 允许一个事件跨多行 data:）
+	let eventBuffer = ''
+
 	try {
 		while (true) {
 			const { value, done } = await reader.read()
 			if (done) break
-			const chunk = decoder.decode(value, { stream: true })
-			const lines = chunk.split('\n').filter((line) => line.trim() !== '')
-			for (const line of lines) {
-				if (!line.trim()) continue
-				if (line.startsWith('data: ') && !line.includes('[DONE]')) {
-					const dataStr = line.substring(6)
-					try {
-						const processedData = JSON.parse(dataStr)
-						// 把回调也包起来，防止“设置 undefined”导致整个流被 abort
-						try {
-							const delta = processedData.choices[0]?.delta
-							onMessages(delta)
-						} catch (cbErr: any) {
-							console.error('回调处理失败:', cbErr)
-						}
-					} catch (parseErr: any) {
-						console.warn('JSON 解析失败:', line, parseErr)
+			// 追加到行级缓冲
+			lineBuffer += decoder.decode(value, { stream: true })
+
+			// 逐行处理（行内以 \n 分割）
+			let lineEndIndex: number
+			while ((lineEndIndex = lineBuffer.indexOf('\n')) !== -1) {
+				const rawLine = lineBuffer.slice(0, lineEndIndex)
+				lineBuffer = lineBuffer.slice(lineEndIndex + 1)
+				// 去除 \r 兼容 Windows 换行
+				const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+
+				// SSE 规则：空行表示事件结束
+				if (line === '') {
+					if (eventBuffer.trim() !== '') {
+						processSseEvent(eventBuffer, onMessages)
 					}
+					eventBuffer = ''
+					continue
 				}
+
+				// SSE 字段行：如果以 "data:" 开头则收集
+				if (line.startsWith('data:')) {
+					const dataValue = line.slice(5).replace(/^ /, '')
+					// 忽略 [DONE] 结束标记
+					if (dataValue.trim() === '[DONE]') {
+						continue
+					}
+					// SSE 多行 data 拼接规则：多个 data: 行之间用 \n 连接
+					if (eventBuffer !== '') {
+						eventBuffer += '\n'
+					}
+					eventBuffer += dataValue
+				}
+				// 其他 SSE 字段（id:/event:/retry:）忽略
 			}
 		}
+		// 流结束时处理 eventBuffer 中可能残留的数据
+		if (eventBuffer.trim() !== '') {
+			processSseEvent(eventBuffer, onMessages)
+		}
 	} catch (readerErr: any) {
-		//  AbortController 主动取消会走到这里
+		// AbortController 主动取消会走到这里
 		if (readerErr.name === 'AbortError') {
 			console.log('~~~DeepSeek请求被主动取消~~~~')
 			return
@@ -100,17 +125,57 @@ export const handleDeepseekResponse = async (response: any, onMessages: (arg0: a
 }
 
 /**
+ * 处理单个 SSE 事件：解析 JSON 并调用回调
+ * 包含防御性检查，避免 choices/delta 为空时崩溃
+ */
+function processSseEvent(dataStr: string, onMessages: (arg0: any) => void) {
+	const trimmed = dataStr.trim()
+	if (!trimmed) return
+	try {
+		const processedData = JSON.parse(trimmed)
+		try {
+			const choices = processedData.choices
+			if (Array.isArray(choices) && choices.length > 0) {
+				const delta = choices[0]?.delta
+				// delta 可能是空对象（流式开始/结束时的占位），也可能为 undefined
+				if (delta && (delta.content || delta.reasoning_content || delta.tool_calls)) {
+					onMessages(delta)
+				}
+			}
+		} catch (cbErr: any) {
+			console.error('DeepSeek接口回调处理失败:', cbErr)
+		}
+	} catch (parseErr: any) {
+		console.warn('DeepSeek接口JSON 解析失败:', trimmed.slice(0, 200), parseErr)
+	}
+}
+
+/**
  * UUID生成
  * @returns {string}
  * @constructor
  */
 export function UUID(): string {
-	let d = new Date().getTime()
-	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-		const r = (d + Math.random() * 16) % 16 | 0
-		d = Math.floor(d / 16)
-		return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
-	})
+	const maxTime = 9007199254740991 // Number.MAX_SAFE_INTEGER
+	const reversedTime = (maxTime - Date.now()).toString(16).padStart(12, '0')
+	const timeHex = reversedTime.slice(0, 11)
+	const firstGroup = timeHex.slice(0, 8)
+	const secondGroupPrefix = timeHex.slice(8, 11)
+	const secondGroup = secondGroupPrefix + '4'
+
+	const thirdGroup =
+		((Math.random() * 4 + 8) | 0).toString(16) +
+		Math.floor(Math.random() * 0x1000)
+			.toString(16)
+			.padStart(3, '0')
+	const fourthGroup = Math.floor(Math.random() * 0x10000)
+		.toString(16)
+		.padStart(4, '0')
+	const fifthGroup = Math.floor(Math.random() * 0x1000000000000)
+		.toString(16)
+		.padStart(12, '0')
+
+	return `${firstGroup}-${secondGroup}-${thirdGroup}-${fourthGroup}-${fifthGroup}`
 }
 
 /**

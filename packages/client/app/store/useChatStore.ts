@@ -2,22 +2,35 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { ChatStore, ChatMessages, ChatDetail } from '@/app/lib/type'
 import { UUID } from '@/app/lib/util'
+import { config } from '@/app/lib/config'
 import { CHAT_STORE_KEY } from '@/app/lib/constant'
+import {
+	getChatList,
+	addChat,
+	removeChat,
+	updateChatTitle,
+	saveChatChild,
+	resetChat,
+	getChatChildList
+} from '@/app/lib/indexedDB'
 
 /**
  * 定义默认的状态
  **/
 const defaultState = {
 	setting: {
-		model: 'deepseek-chat',
+		model: config.ai.defaultModel,
 		temperature: 0.8,
 		maxTokens: 2048,
-    contextDeep: 5
+		contextDeep: 5
 	},
 	messages: [],
+	historys: [],
 	currentChatId: null,
 	// 当前角色ID(不需要持久化)
-	currentRoleId: null
+	currentRoleId: null,
+	// 当前对话数据(不需要持久化)
+	currentChatData: null
 }
 
 /**
@@ -40,94 +53,115 @@ export const useChatStore: any = create<ChatStore>()(
 	// 使用 persist 中间件实现状态持久化
 	persist(
 		// store 的初始状态和状态更新方法
-		(set) => ({
+		(set, get) => ({
 			// 初始化数据
 			...initialState(),
 			// 更新设置
 			updateSetting: (prefs) =>
 				// 使用函数式更新，获取当前状态并合并新的偏好设置
-				set((state) => ({
-					setting: { ...state.setting, ...prefs }
-				})),
+				set({
+					setting: { ...get().setting, ...prefs }
+				}),
 			// 创建当前聊天ID
 			createCurrentChatId: () => {
 				// 生成唯一ID
 				const newId = UUID()
-				set({ currentChatId: newId, currentRoleId: null })
+				set({ currentChatId: newId, currentRoleId: null, currentChatData: null, historys: [] })
 			},
 			// 更新当前聊天ID
-			updateCurrentChatId: (chatId: string) => {
-				set({ currentChatId: chatId, currentRoleId: null })
+			updateCurrentChatId: async (chatId: string) => {
+				const historys = (await getChatChildList(chatId)) || []
+				set({
+					currentChatId: chatId,
+					currentRoleId: null,
+					currentChatData: get().messages.find((item) => item.chatId === chatId) || null,
+					historys
+				})
 			},
 			// 更新当前角色ID
 			updateCurrentRoleId: (roleId: string) => {
 				const updateData: Record<string, any> = {
 					currentRoleId: roleId
 				}
-        // 当角色ID不为空时，则需要清空当前对话并新建对话
+				// 当角色ID不为空时，则需要清空当前对话并新建对话
 				if (roleId) {
 					updateData.currentChatId = UUID()
 				}
 				set(updateData)
 			},
 			// 添加新消息
-			addMessage: (newMessage: ChatMessages) => {
-				set((state) => ({
-					messages: [{ ...newMessage }, ...state.messages]
-				}))
+			addMessage: async (newMessage: ChatMessages) => {
+				set({
+					messages: [{ ...newMessage }, ...get().messages]
+				})
+				await addChat(newMessage, newMessage.chatId)
 			},
 			// 删除消息
-			removeMessage: (id: string) => {
-				set((state) => ({
-					messages: state.messages.filter((item) => item.chatId !== id)
-				}))
+			removeMessage: async (id: string) => {
+				set({
+					currentChatData: id === get().currentChatId ? null : get().currentChatData,
+					messages: get().messages.filter((item) => item.chatId !== id),
+					historys: id === get().currentChatId ? [] : get().historys || []
+				})
+				await removeChat(id)
+				if (id === get().currentChatId) {
+					get().createCurrentChatId()
+					get().updateCurrentRoleId('')
+				}
 			},
 			// 更新消息标题
-			updateMessageTitle: (id: string, title: string) => {
+			updateMessageTitle: async (id: string, title: string, isPersist: boolean = false) => {
 				set((state) => ({
 					messages: state.messages.map((e) => (e.chatId === id ? { ...e, title, isAutoTitle: true } : e))
 				}))
+				if (isPersist) {
+					await updateChatTitle(id, title)
+				}
 			},
-			// 移动消息位置
-			moveMessage: (fromIndex: number, toIndex: number) => {
-				set((state) => {
-					const newItems = [...state.messages]
-					const [movedItem] = newItems.splice(fromIndex, 1)
-					newItems.splice(toIndex, 0, movedItem)
-					return { messages: newItems }
-				})
-			},
-			// 清除全部消息
-			resetMessages: () => set({ messages: [] }),
 			// 添加子消息
-			addMessageChild: (chatId: string, item: ChatDetail) => {
-				set((state) => {
-					return {
-						messages: state.messages.map((team) =>
-							team.chatId === chatId
-								? {
-										...team,
-										list: [...team.list, { ...item }]
-									}
-								: team
-						)
-					}
+			addMessageChild: (item: ChatDetail) => {
+				set({
+					historys: [...get().historys, item]
 				})
 			},
 			// 更新子消息(只会更新最后一条)
-			updateMessageChild: (chatId: string, item: ChatDetail) => {
-				set((state) => {
-					return {
-						messages: state.messages.map((team) =>
-							team.chatId === chatId
-								? {
-										...team,
-										list: [...team.list.slice(0, -1), { ...team.list[team.list.length - 1], ...item }]
-									}
-								: team
-						)
-					}
+			updateMessageChild: (item: ChatDetail) => {
+				const lastItem = get().historys[get().historys.length - 1]
+				const newHistorys = [...get().historys.slice(0, -1), { ...lastItem, ...item }]
+				set({
+					historys: newHistorys
 				})
+			},
+			// 保存子消息持久化
+			saveMessageChild: async (chatId: string, item: ChatDetail) => {
+				const lastItem = get().historys[get().historys.length - 1]
+				const newHistorys = [...get().historys.slice(0, -1), { ...lastItem, ...item }]
+				await saveChatChild(chatId, newHistorys)
+			},
+			// 加载对话
+			loadMessages: async () => {
+				const messages = (await getChatList()) || []
+				const currentChatId = get().currentChatId
+				let historys: ChatDetail[] = []
+				let currentChatData: ChatMessages | null = null
+				if (currentChatId) {
+					historys = (await getChatChildList(currentChatId)) || []
+					currentChatData = messages.find((item) => item.chatId === currentChatId) || null
+				}
+				set({
+					messages,
+					currentChatData,
+					historys
+				})
+				// 如果当前聊天 ID 不在消息列表中，自动创建
+				if (!messages.some((item) => item.chatId === currentChatId)) {
+					get().createCurrentChatId()
+				}
+			},
+			// 清除全部消息
+			resetMessages: () => {
+				set({ currentChatId: null, currentRoleId: null, currentChatData: null, messages: [], historys: [] })
+				resetChat()
 			}
 		}),
 		{
@@ -154,7 +188,6 @@ export const useChatStore: any = create<ChatStore>()(
 			// 指定哪些状态属性需要持久化，排除方法
 			partialize: (state) => ({
 				setting: state.setting,
-				messages: state.messages,
 				currentChatId: state.currentChatId
 			}),
 			// 状态迁移函数

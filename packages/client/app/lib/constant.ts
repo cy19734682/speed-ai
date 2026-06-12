@@ -13,23 +13,24 @@ export const CHAT_STORE_KEY = 'chat-storage'
  */
 export const CHAT_ASSISTANT_STORE_KEY = 'chat-assistant-storage'
 
+
 /**
  * 模型列表
  */
 export const models = [
 	{
-		name: 'DeepSeek-Chat',
-		value: 'deepseek-chat',
+		name: '快速模式',
+		value: 'deepseek-v4-flash',
 		icon: DeepSeekIcon,
 		isThink: false,
-		description: '通用模型，响应速度快'
+		description: '快捷高效的经济之选'
 	},
 	{
-		name: 'DeepSeek-Reasoner',
-		value: 'deepseek-reasoner',
+		name: '专家模式',
+		value: 'deepseek-v4-pro',
 		icon: ThinkIcon,
 		isThink: true,
-		description: '推理模型，复杂问题解决'
+		description: '性能比肩顶级闭源模型'
 	}
 ]
 
