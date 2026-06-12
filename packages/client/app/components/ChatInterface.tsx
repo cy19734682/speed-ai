@@ -30,7 +30,8 @@ const ChatInterface: React.FC<any> = () => {
 		messagesEndRef,
 		scrollTopButtonRef,
 		scrollBottomButtonRef,
-		chatData,
+		currentChatData,
+		historys,
 		error,
 		inputValue,
 		isProcessing,
@@ -50,7 +51,7 @@ const ChatInterface: React.FC<any> = () => {
 		currentModel,
 		setInputValue,
 		setError,
-		handleKeyDown ,
+		handleKeyDown,
 		handleSendMessage,
 		handleCancel,
 		scrollToTop,
@@ -71,11 +72,12 @@ const ChatInterface: React.FC<any> = () => {
 	 * @constructor
 	 */
 	const MarkdownThinkContent = ({ message }: { message: ChatRoundDetail }) => {
-		// 是否正在思考
-		const isThinking = message.think && !message.time
+		// 是否正在思考（message.time 为 null/undefined 才算未结束；0 秒也算结束）
+		const hasThinkContent = !!message.think
+		const hasThinkTime = message.time != null && message.time !== ''
+		const isThinking = hasThinkContent && !hasThinkTime
 		// 是否思考结束
-		const isThinkEnd = message.think && message.time
-
+		const isThinkEnd = hasThinkContent && hasThinkTime
 		const [isOpen, setIsOpen] = useState(true)
 
 		return (
@@ -83,7 +85,7 @@ const ChatInterface: React.FC<any> = () => {
 				{(isThinking || isThinkEnd) && (
 					<div>
 						<div
-							className="w-fit text-[12px] my-2 flex items-center w py-1 px-2 bg-gray-100 rounded-md cursor-pointer"
+							className={`w-fit text-[12px] my-2 flex items-center w py-1 px-2 bg-gray-100 rounded-md ${isThinkEnd ? 'cursor-pointer' : ''}`}
 							onClick={(e) => {
 								e.stopPropagation()
 								if (isThinkEnd) {
@@ -149,7 +151,7 @@ const ChatInterface: React.FC<any> = () => {
 						>
 							{result?.map((item: any, index: number) => (
 								<div
-									key={item.title}
+									key={item.title + index}
 									className={`flex-shrink-0 ${isOpen ? 'w-[170px]' : 'w-40'} h-14 bg-gray-100 rounded-xl p-2 flex flex-col justify-between`}
 								>
 									<div
@@ -233,19 +235,19 @@ const ChatInterface: React.FC<any> = () => {
 	return (
 		<div className="card h-full flex flex-col">
 			<div className="card-header flex justify-between items-center">
-				<h2 className="text-xl font-semibold pr-5 truncate">{chatData?.title || '聊天'}</h2>
+				<h2 className="text-xl font-semibold pr-5 truncate">{currentChatData?.title || '聊天'}</h2>
 			</div>
 			<div className="flex-1 overflow-y-auto p-2 lg:p-4 space-y-4">
 				<div ref={messagesTopRef} />
-				{!chatData?.list || chatData?.list?.length === 0 ? (
+				{!historys || historys?.length === 0 ? (
 					<div className="flex flex-col items-center justify-center h-[350px] lg:h-[450px] text-center text-gray-500">
 						<ChatIcon cls="text-gray-300 mb-3 h-12 w-12" />
 						<p>还没有消息。开始一个对话吧！</p>
 					</div>
 				) : (
-					chatData?.list?.map?.((message: ChatDetail, index: number) => (
+					historys?.map?.((message: ChatDetail, index: number) => (
 						<div
-							key={message.chatId + index}
+							key={'history' + index}
 							className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} my-2`}
 						>
 							{message.role !== 'user' && (
@@ -265,7 +267,7 @@ const ChatInterface: React.FC<any> = () => {
 								{message.role === 'assistant' ? (
 									message?.contents?.length > 0 ? (
 										message?.contents?.map?.((item: ChatRoundDetail, index1: number) => (
-											<div key={message.chatId + index + index1}>
+											<div key={'assistant' + index + index1}>
 												{/*AI思维链消息回复*/}
 												<MarkdownThinkContent message={item} />
 												{/*AI消息回复*/}

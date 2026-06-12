@@ -23,6 +23,6 @@ export const config: Config = {
       process.env.DEEPSEEK_API_URL ||
       "https://api.deepseek.com/v1/chat/completions",
     // 默认模型
-    defaultModel: process.env.DEFAULT_MODEL || "deepseek-chat",
-  },
-};
+    defaultModel: process.env.DEFAULT_MODEL || 'deepseek-v4-flash'
+  }
+}

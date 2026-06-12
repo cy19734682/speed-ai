@@ -67,7 +67,7 @@ DEEPSEEK_API_KEY=sk-...
 DEEPSEEK_API_URL=https://api.deepseek.com/v1/chat/completions
 
 # 默认使用的AI模型
-DEFAULT_MODEL=deepseek-chat
+DEFAULT_MODEL=deepseek-v4-flash
 ```
 
 在 mcp-server 目录下创建 `.env` 文件，并添加以下配置：

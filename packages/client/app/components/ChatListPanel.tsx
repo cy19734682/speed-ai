@@ -11,11 +11,11 @@ import { useToast } from '@/app/components/commons/Toast'
  * @constructor
  */
 const ChatListPanel: React.FC = () => {
-  const { confirm } = useConfirm()
-  const toast = useToast()
+	const { confirm } = useConfirm()
+	const toast = useToast()
 	const { setIsModalSettingOpen, setIsModalMcpOpen, setIsModalAssistantOpen } = useGeneralStore()
 	const { updateMessageTitle } = useChatStore()
-	const { chatGroups, currentChatId, selectChat, removeMessage, handleNewMessage } = useChatList()
+	const { chatGroups, currentChatId, updateCurrentChatId, removeMessage, createCurrentChatId } = useChatList()
 
 	/**
 	 * 菜单项
@@ -76,7 +76,7 @@ const ChatListPanel: React.FC = () => {
 		 */
 		const handleRename = () => {
 			if (editTitle.trim() !== '') {
-				updateMessageTitle(chat.chatId, editTitle)
+				updateMessageTitle(chat.chatId, editTitle, true)
 				setIsEditing(false)
 			}
 		}
@@ -189,7 +189,7 @@ const ChatListPanel: React.FC = () => {
 										onClick={(e: any) => {
 											e.stopPropagation()
 											if (chat.chatId !== currentChatId) {
-												selectChat(chat.chatId)
+												updateCurrentChatId(chat.chatId)
 												setIsModalSettingOpen(false)
 											}
 										}}
@@ -222,7 +222,7 @@ const ChatListPanel: React.FC = () => {
 				<button
 					className="text-sm px-3 py-2 btn-primary text-white rounded-md shadow-sm transition-all duration-300 ease-in-out flex items-center justify-center"
 					onClick={() => {
-						handleNewMessage()
+						createCurrentChatId()
 						setIsModalSettingOpen(false)
 					}}
 				>

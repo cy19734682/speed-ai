@@ -4,10 +4,14 @@ export interface ChatStore {
 	setting: ChatSettingIcon
 	// 对话消息列表
 	messages: ChatMessages[]
+	// 对话历史列表
+	historys: ChatDetail[]
 	// 当前对话ID
 	currentChatId: string | null
 	// 当前AI助手ID(不需要持久化)
-  currentRoleId: string | null
+	currentRoleId: string | null
+	// 当前对话数据(不需要持久化)
+	currentChatData: ChatMessages | null
 	// 更新对话设置
 	updateSetting: (prefs: Partial<ChatStore['setting']>) => void
 	// 添加消息
@@ -15,13 +19,10 @@ export interface ChatStore {
 	// 移除消息
 	removeMessage: (chatId: string) => void
 	// 更新消息标题
-	updateMessageTitle: (chatId: string, title: string) => void
-	// 移动消息位置
-	moveMessage: (fromIndex: number, toIndex: number) => void
-	// 添加子消息
-	addMessageChild: (chatId: string, item: ChatMessages) => void
-	// 更新子消息
-	updateMessageChild: (chatId: string, item: ChatMessages) => void
+	updateMessageTitle: (chatId: string, title: string, isPersist: boolean) => void
+	addMessageChild: (item: ChatDetail) => void
+	updateMessageChild: (item: ChatDetail) => void
+	saveMessageChild: (chatId: string, item: ChatDetail) => void
 	// 重置消息
 	resetMessages: () => void
 	// 创建新的聊天ID
@@ -29,24 +30,26 @@ export interface ChatStore {
 	// 更新聊天ID
 	updateCurrentChatId: (chatId: string) => void
 	// 更新角色ID
-  updateCurrentRoleId: (roleId: string) => void
+	updateCurrentRoleId: (roleId: string) => void
+	// 加载对话
+	loadMessages: () => void
 }
 
 // MCP状态管理
 export interface McpStore {
-  searchTool: McpTool
+	searchTool: McpTool
 	tools: McpTool[]
 	addTool: (newItem: McpTool) => void
 	removeTool: (id: string) => void
 	updateTool: (id: string, item: McpTool) => void
-  updateAllTool: (items: McpTool[]) => void
+	updateAllTool: (items: McpTool[]) => void
 	resetTool: () => void
-  updateSearchTool: (newItem: McpTool) => void
+	updateSearchTool: (newItem: McpTool) => void
 }
 
 // AI对话角色状态管理
 export interface ChatAssistantStore {
-  assistants: Assistant[]
+	assistants: Assistant[]
 	addAssistant: (newItem: Assistant) => void
 	removeAssistant: (id: string) => void
 	updateAssistant: (id: string, item: Assistant) => void
@@ -55,11 +58,11 @@ export interface ChatAssistantStore {
 
 // 对话设置
 export interface ChatSettingIcon {
-  model: string
-  temperature: number
-  maxTokens: number
-  contextDeep: number
-  [x: string]: any
+	model: string
+	temperature: number
+	maxTokens: number
+	contextDeep: number
+	[x: string]: any
 }
 
 // 多轮对话详情
@@ -78,9 +81,8 @@ export interface ChatRoundDetail {
 
 // 对话详情
 export interface ChatDetail {
-	chatId: string
-	role: 'user' | 'assistant' | 'system'
-	createdAt: string
+	role?: 'user' | 'assistant' | 'system'
+	createdAt?: string
 	content: string
 	contents: ChatRoundDetail[]
 	[x: string]: any
@@ -91,8 +93,7 @@ export interface ChatMessages {
 	chatId: string
 	createdAt: string
 	title: string
-	isAutoTitle: boolean
-	list: ChatDetail[]
+	isAutoTitle?: boolean
 	[x: string]: any
 }
 
@@ -103,10 +104,10 @@ export interface McpTool {
 	name: string
 	url: string
 	tag: string
-  description: string
+	description: string
 	accessToken: string
 	tool: string
-  enabled: boolean
+	enabled: boolean
 	[x: string]: any
 }
 
@@ -114,15 +115,15 @@ export interface McpTool {
 export interface Assistant {
 	id: string
 	name: string
-  prompt: string
+	prompt: string
 	[x: string]: any
 }
 
 // 工具类型
 export interface Tool {
-  name: string
-  description: string
-  input_schema: any;
+	name: string
+	description: string
+	input_schema: any
 }
 
 export interface DeepSeekTool {
@@ -132,8 +133,8 @@ export interface DeepSeekTool {
 
 // 定义消息类型(DeepSeek官方)
 export interface Message {
-  role: 'user' | 'assistant'
-  content: string
+	role: 'user' | 'assistant'
+	content: string
 }
 
 export interface ChatCompletionOptions {
@@ -189,7 +190,6 @@ export type DeepSeekResponse = {
 	}>
 }
 
-
 // 菜单类型
 export interface MenuItem {
 	id: number
@@ -198,22 +198,20 @@ export interface MenuItem {
 	type: 'normal' | 'edit' | 'delete' // 增加类型，可选
 }
 
-
-
 // 列表分支
 export interface PaginatedGroup {
-  name: string,
-  data: ChatMessages [],
-  total: number,
-  hasMore: boolean,
-  currentPage: number
+	name: string
+	data: ChatMessages[]
+	total: number
+	hasMore: boolean
+	currentPage: number
 }
 
 // 菜单类型
 export interface MessagesGroup {
-  groups: PaginatedGroup [],
-  total: number,
-  currentPage: number,
-  pageSize: number,
-  hasNextPage: boolean
+	groups: PaginatedGroup[]
+	total: number
+	currentPage: number
+	pageSize: number
+	hasNextPage: boolean
 }
