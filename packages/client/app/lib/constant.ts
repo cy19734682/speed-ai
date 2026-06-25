@@ -15,6 +15,28 @@ export const CHAT_ASSISTANT_STORE_KEY = 'chat-assistant-storage'
 
 
 /**
+ * 联网搜索工具的存储键名
+ */
+export const WEB_SEARCH_KEY = 'web_search'
+
+/**
+ * 数据库名称
+ */
+export const DB_NAME_KEY = 'ChatDB'
+/**
+ * 数据库版本
+ */
+export const DB_VERSION_KEY = 1
+/**
+ * 对话列表存储键名
+ */
+export const CHAT_LIST_STORE_KEY = 'chatList'
+/**
+ * 对话详情存储键名
+ */
+export const CHAT_DETAIL_STORE_KEY = 'chatHistory'
+
+/**
  * 模型列表
  */
 export const models = [
@@ -33,9 +55,3 @@ export const models = [
 		description: '性能比肩顶级闭源模型'
 	}
 ]
-
-
-/**
- * 联网搜索工具的存储键名
- */
-export const WEB_SEARCH_KEY = 'web_search'

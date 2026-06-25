@@ -78,6 +78,7 @@
   font-size: 0.9rem;
   line-height: 1.5;
   margin: 1rem 0;
+  background-color: #1e293b;
 }
 .markdown-content pre.hljs {
   margin: 0;

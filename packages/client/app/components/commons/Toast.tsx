@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext, useCallback, ReactNode, FC } from 'react'
-import {CloseIcon} from "@/app/styles/SvgIcon"
+import { CloseIcon } from '@/app/styles/SvgIcon'
 
 // 定义Toast类型
 type ToastType = 'success' | 'error' | 'warning' | 'info'
@@ -216,7 +216,7 @@ const ToastItem: FC<ToastItemProps> = ({ id, message, type, duration = 3000, onD
 					className="ml-4 text-current cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
 					aria-label="关闭提示"
 				>
-          <CloseIcon cls="w-4 h-4" />
+					<CloseIcon cls="w-4 h-4" />
 				</button>
 			</div>
 		</div>

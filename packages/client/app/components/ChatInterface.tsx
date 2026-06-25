@@ -1,25 +1,24 @@
-import React, { useState } from 'react'
+import React from 'react'
 import useChatContent from '@/app/hooks/useChatContent'
 import { ChatDetail, ChatRoundDetail } from '@/app/lib/type'
 import {
-	ThinkIcon,
-	ArrowDownIcon,
 	LoadingIcon,
 	ChatIcon,
 	ToTopIcon,
 	CloseIcon,
 	SendIcon,
-	WebSearchIcon,
-	McpSettingIcon,
-	CheckMarkIcon,
 	StopIcon,
-	ToolIcon,
-	SuccessIcon,
-	SearchIcon,
-	ErrorIcon
+	ErrorIcon,
+	UploadIcon
 } from '@/app/styles/SvgIcon'
-import ChatReply from '@/app/components/commons/ChatReply'
-import { models } from '@/app/lib/constant'
+import ChatReply from '@/app/components/chat/ChatReply'
+import UserReply from '@/app/components/chat/UserReply'
+import KnowledgeReply from '@/app/components/chat/KnowledgeReply'
+import MarkdownThinkReply from '@/app/components/chat/MarkdownThinkReply'
+import McpToolReply from '@/app/components/chat/McpToolReply'
+import WebSearchReply from '@/app/components/chat/WebSearchReply'
+import McpToolSelect from '@/app/components/chat/McpToolSelect'
+import { useMcpToolSelect } from '@/app/components/chat/McpToolSelect'
 /**
  * 对话主界面
  * @constructor
@@ -35,20 +34,11 @@ const ChatInterface: React.FC<any> = () => {
 		error,
 		inputValue,
 		isProcessing,
-		webSearch,
-		thinking,
-		toolsRef,
-		selectedModel,
-		isToolsOpen,
-		mcpList,
-		enabledToolsCount,
-		isModelMenuOpen,
-		modelButtonRef,
-		modelMenuRef,
-		toolsButtonRef,
 		textareaRef,
 		assistantData,
-		currentModel,
+		uploadedFiles,
+		isUploading,
+		fileInputRef,
 		setInputValue,
 		setError,
 		handleKeyDown,
@@ -56,181 +46,13 @@ const ChatInterface: React.FC<any> = () => {
 		handleCancel,
 		scrollToTop,
 		scrollToBottom,
-		toggleWenSearch,
-		toggleThinking,
-		selectModel,
-		setIsToolsOpen,
-		disEnableAllTools,
-		toggleTool,
-		setIsModelMenuOpen,
-		clearAssistantData
+		clearAssistantData,
+		handleOpenFilePicker,
+		handleFileChange,
+		handleRemoveFile
 	} = useChatContent()
 
-	/**
-	 * AI思维链消息（深度思考）回复
-	 * @param chat
-	 * @constructor
-	 */
-	const MarkdownThinkContent = ({ message }: { message: ChatRoundDetail }) => {
-		// 是否正在思考（message.time 为 null/undefined 才算未结束；0 秒也算结束）
-		const hasThinkContent = !!message.think
-		const hasThinkTime = message.time != null && message.time !== ''
-		const isThinking = hasThinkContent && !hasThinkTime
-		// 是否思考结束
-		const isThinkEnd = hasThinkContent && hasThinkTime
-		const [isOpen, setIsOpen] = useState(true)
-
-		return (
-			<>
-				{(isThinking || isThinkEnd) && (
-					<div>
-						<div
-							className={`w-fit text-[12px] my-2 flex items-center w py-1 px-2 bg-gray-100 rounded-md ${isThinkEnd ? 'cursor-pointer' : ''}`}
-							onClick={(e) => {
-								e.stopPropagation()
-								if (isThinkEnd) {
-									setIsOpen(!isOpen)
-								}
-							}}
-						>
-							<ThinkIcon cls="mr-1" />
-							{isThinking && '正在思考...'}
-							{isThinkEnd && `已深度思考（用时${message.time || 0}秒）`}
-							{isThinkEnd && (
-								<div className={`ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`}>
-									<ArrowDownIcon />
-								</div>
-							)}
-						</div>
-						<div
-							className={`text-sm px-3 my-3 text-[#8b8b8b] whitespace-pre-wrap border-l-2 ${isOpen ? 'block' : 'hidden'}`}
-						>
-							{message.think}
-						</div>
-					</div>
-				)}
-			</>
-		)
-	}
-
-	/**
-	 * AI联网搜索结果回复
-	 * @param chat
-	 * @constructor
-	 */
-	const WebSearchContent = ({ message }: { message: ChatRoundDetail }) => {
-		// 联网搜索结果
-		const { type, toolName, params, result }: any = message.search || {}
-		const [isOpen, setIsOpen] = useState(false)
-		return (
-			<>
-				{toolName?.length > 0 && (
-					<div className="relative">
-						<div
-							className="w-full min-w-[300px] text-xs my-1 flex justify-between items-center py-2 border px-2 rounded-md cursor-pointer"
-							onClick={(e) => {
-								e.stopPropagation()
-								setIsOpen(!isOpen)
-							}}
-						>
-							<div className="font-bold flex items-center">
-								{toolName}
-								<SearchIcon cls="text-blue-600 ml-1" />
-								{type === 'start' ? <LoadingIcon /> : <SuccessIcon cls="text-green-600 ml-1" />}
-							</div>
-							<div>
-								<ArrowDownIcon cls={`ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-							</div>
-						</div>
-						<div className={`flex items-center text-xs pl-2 mt-2 ${isOpen ? 'block' : 'hidden'}`}>
-							搜索关键字：
-							<span className="text-gray-600 font-bold italic">{params?.query || ''}</span>
-						</div>
-						<div
-							className={`py-2 flex scroll-smooth gap-2 transition-all duration-300 ${isOpen ? 'flex-wrap overflow-x-hidden' : 'flex-nowrap overflow-x-auto'}`}
-						>
-							{result?.map((item: any, index: number) => (
-								<div
-									key={item.title + index}
-									className={`flex-shrink-0 ${isOpen ? 'w-[170px]' : 'w-40'} h-14 bg-gray-100 rounded-xl p-2 flex flex-col justify-between`}
-								>
-									<div
-										className="cursor-pointer"
-										onClick={() => {
-											window.open(item.link)
-										}}
-									>
-										<h3 className="text-sm truncate" title={item.title}>
-											{index + 1}. {item.title}
-										</h3>
-										<p className="text-gray-400 text-xs mt-1 truncate" title={item.link}>
-											{item.link}
-										</p>
-									</div>
-								</div>
-							))}
-						</div>
-					</div>
-				)}
-			</>
-		)
-	}
-
-	/**
-	 * MCP工具调用结果回复
-	 * @param chat
-	 * @constructor
-	 */
-	const McpToolContent = ({ message }: { message: ChatRoundDetail }) => {
-		// 联网搜索结果
-		const tools: any[] = message.tools || []
-
-		const McpToolItem = ({ tool }: { tool: any }) => {
-			// 联网搜索结果
-			const { toolName, type, params, result } = tool || {}
-			const [isOpen, setIsOpen] = useState(false)
-			return (
-				<div className="relative mt-2">
-					<div
-						className="w-full min-w-[300px] text-xs my-1 flex justify-between items-center py-2 border px-2 rounded-md cursor-pointer"
-						onClick={(e) => {
-							e.stopPropagation()
-							setIsOpen(!isOpen)
-						}}
-					>
-						<div className="font-bold flex items-center">
-							{toolName}
-							<ToolIcon cls="text-blue-600 ml-1" />
-							{type === 'start' ? <LoadingIcon /> : <SuccessIcon cls="text-green-600 ml-1" />}
-						</div>
-						<div>
-							<ArrowDownIcon cls={`ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-						</div>
-					</div>
-					<div className={`py-2 border rounded-md transition-all duration-300 ${isOpen ? 'block' : 'hidden'}`}>
-						<div className="rounded-xl p-2">
-							<div className="text-gray-500 text-sm">参数</div>
-							<div className="bg-gray-100 rounded-xl overflow-auto p-2 m-0 text-xs">
-								<pre>{JSON.stringify(params, null, 2)}</pre>
-							</div>
-						</div>
-						<div className="rounded-xl p-2">
-							<div className="text-gray-500 text-sm">结果</div>
-							<div className="bg-gray-100 rounded-xl overflow-auto p-2 m-0 text-xs">
-								<pre>{JSON.stringify(result, null, 2)}</pre>
-							</div>
-						</div>
-					</div>
-				</div>
-			)
-		}
-		return (
-			<>
-				{tools?.length > 0 &&
-					tools.map((item: any, index: number) => <McpToolItem tool={item} key={item.toolName + index} />)}
-			</>
-		)
-	}
+	const { webSearch, thinking, knowledge, selectedModel, enabledToolsCount } = useMcpToolSelect()
 
 	return (
 		<div className="card h-full flex flex-col">
@@ -247,7 +69,7 @@ const ChatInterface: React.FC<any> = () => {
 				) : (
 					historys?.map?.((message: ChatDetail, index: number) => (
 						<div
-							key={'history' + index}
+							key={(message.createdAt || 'history') + index}
 							className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} my-2`}
 						>
 							{message.role !== 'user' && (
@@ -267,15 +89,17 @@ const ChatInterface: React.FC<any> = () => {
 								{message.role === 'assistant' ? (
 									message?.contents?.length > 0 ? (
 										message?.contents?.map?.((item: ChatRoundDetail, index1: number) => (
-											<div key={'assistant' + index + index1}>
+											<div key={'assistant-' + index + '-' + index1}>
+												{/*AI知识库检索结果回复*/}
+												<KnowledgeReply message={item} />
 												{/*AI思维链消息回复*/}
-												<MarkdownThinkContent message={item} />
+												<MarkdownThinkReply message={item} />
 												{/*AI消息回复*/}
 												<ChatReply content={item.middle} isProcessing={isProcessing} />
 												{/*联网搜索*/}
-												<WebSearchContent message={item} />
+												<WebSearchReply message={item} />
 												{/*MCP工具调用*/}
-												<McpToolContent message={item} />
+												<McpToolReply message={item} />
 												{/*工具加载中*/}
 												{item?.loading ? (
 													<div className="ml-2 inline-block">
@@ -291,6 +115,8 @@ const ChatInterface: React.FC<any> = () => {
 											<LoadingIcon cls="h-4 w-4" />
 										</div>
 									)
+								) : message.role === 'user' ? (
+									<UserReply message={message} />
 								) : (
 									<div className="whitespace-pre-wrap">{message.content}</div>
 								)}
@@ -353,6 +179,28 @@ const ChatInterface: React.FC<any> = () => {
 						</div>
 					)}
 					<div className="flex flex-col border p-2 border-gray-300 rounded-xl shadow-inner bg-white">
+						{/* 已上传文件列表 */}
+						{uploadedFiles && uploadedFiles.length > 0 && (
+							<div className="flex flex-wrap gap-2 pb-4 border-gray-200">
+								{uploadedFiles.map((file: any) => (
+									<div
+										key={file.id}
+										className="flex items-center gap-1 px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100"
+										title={file.name}
+									>
+										<span className="max-w-[140px] truncate">{file.name}</span>
+										<button
+											type="button"
+											onClick={() => handleRemoveFile(file.id)}
+											className="ml-1 text-indigo-500 hover:text-red-600"
+											aria-label="移除文件"
+										>
+											<CloseIcon cls="w-3 h-3" />
+										</button>
+									</div>
+								))}
+							</div>
+						)}
 						<div className="flex-1 relative">
 							<textarea
 								ref={textareaRef}
@@ -369,184 +217,29 @@ const ChatInterface: React.FC<any> = () => {
 						<div className="flex justify-between items-center mt-1">
 							{/* 左侧控制按钮组 */}
 							<div className="flex items-center pl-2 space-x-2">
-								<div className="relative">
-									{/* 模型选择菜单 */}
-									<button
-										ref={modelButtonRef}
-										onClick={() => setIsModelMenuOpen(!isModelMenuOpen)}
-										className="flex items-center h-9 px-2 py-2 rounded-lg bg-gradient-to-r from-indigo-100 to-blue-100 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-colors"
-										aria-label="选择模型"
-									>
-										{currentModel.icon && <currentModel.icon cls="w-6 lg:w-4 h-6 lg:h-4 mr-0 lg:mr-1" />}
-										<span className="hidden lg:block text-[13px] font-medium truncate max-w-16 md:max-w-[inherit]">
-											{currentModel.name}
-										</span>
-										<ArrowDownIcon
-											cls={`hidden lg:block ml-1 transition-transform ${isModelMenuOpen ? 'rotate-180' : ''}`}
-										/>
-									</button>
-									{/* 模型选择菜单 - 模拟下拉列表 */}
-									{isModelMenuOpen && (
-										<div
-											ref={modelMenuRef}
-											className="absolute bottom-full mb-2 w-52 z-20 bg-white border border-gray-200 rounded-lg shadow-lg"
-										>
-											<div className="p-2">
-												<h3 className="text-xs font-medium text-gray-700 mb-1">选择模型</h3>
-												<div className="space-y-1">
-													{models &&
-														models.map((item) => (
-															<button
-																key={item.value}
-																onClick={() => {
-																	selectModel(item.value)
-																	setIsModelMenuOpen(false)
-																}}
-																className={`w-full flex items-center p-2 text-[13px] rounded-md ${
-																	selectedModel === item.value
-																		? 'bg-gradient-to-r from-indigo-50 to-blue-50 text-indigo-700 font-medium'
-																		: 'hover:bg-gray-50 text-gray-700'
-																}`}
-															>
-																{item.icon && <item.icon cls="w-4 h-4 mr-1" />}
-																<span className="flex flex-col items-start">
-																	{item.name}
-																	<span className="text-xs mt-1">{item.description}</span>
-																</span>
-																{selectedModel === item.value && <CheckMarkIcon />}
-															</button>
-														))}
-												</div>
-											</div>
-										</div>
-									)}
-								</div>
-
-								{/* 思考模式按钮 - 图标 */}
-								<button
-									disabled={!!currentModel.isThink}
-									onClick={toggleThinking}
-									className={`flex items-center justify-center w-9 h-9 rounded-lg border transition-colors
-									 ${!!currentModel.isThink ? 'cursor-not-allowed' : ''}
-									 ${
-											thinking
-												? 'bg-gradient-to-r from-blue-100 to-indigo-100 border-blue-300 text-blue-600'
-												: 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-50'
-										}`}
-									aria-label={thinking ? '关闭思考模式' : '开启思考模式'}
-									title={thinking ? '关闭思考模式' : '开启思考模式'}
-								>
-									<ThinkIcon width={20} height={20} />
-								</button>
-
-								{/* 联网搜索按钮 - 图标 */}
-								<button
-									onClick={toggleWenSearch}
-									className={`flex items-center justify-center w-9 h-9 rounded-lg border transition-colors ${
-										webSearch
-											? 'bg-gradient-to-r from-blue-100 to-indigo-100 border-blue-300 text-blue-600'
-											: 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-50'
-									}`}
-									aria-label={webSearch ? '关闭联网搜索' : '开启联网搜索'}
-									title={webSearch ? '关闭联网搜索' : '开启联网搜索'}
-								>
-									<WebSearchIcon />
-								</button>
-
-								{/* MCP工具按钮 - 图标 */}
-								<div className="relative">
-									<button
-										ref={toolsButtonRef}
-										onClick={() => setIsToolsOpen(!isToolsOpen)}
-										className={`flex items-center justify-center w-9 h-9 rounded-lg border transition-colors ${
-											enabledToolsCount > 0
-												? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-indigo-300 text-indigo-600'
-												: 'bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-50'
-										}`}
-										aria-label="工具设置"
-										title="工具设置"
-									>
-										<McpSettingIcon />
-										{enabledToolsCount > 0 && (
-											<span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-indigo-500 text-white text-[10px] flex items-center justify-center">
-												{enabledToolsCount}
-											</span>
-										)}
-									</button>
-
-									{isToolsOpen && (
-										<div
-											ref={toolsRef}
-											className="absolute left-[-50px] lg:left-0 z-10 w-56 max-h-[50vh] bottom-full mb-2 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg"
-										>
-											<div className="sticky top-0 p-3 border-b border-gray-200 bg-white z-10">
-												<div className="flex justify-between items-center">
-													<h3 className="text-sm font-medium text-gray-800">可用工具</h3>
-													<div className="flex space-x-1">
-														<button
-															onClick={() => disEnableAllTools(true)}
-															className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600"
-														>
-															全选
-														</button>
-														<button
-															onClick={() => disEnableAllTools(false)}
-															className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-600"
-														>
-															清空
-														</button>
-													</div>
-												</div>
-											</div>
-											<div className="divide-y divide-gray-100 w-full">
-												{mcpList.map((tool) => (
-													<div
-														key={tool.id}
-														className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer"
-														onClick={() => toggleTool(tool)}
-													>
-														<div className="w-[80%]">
-															<div className="flex items-center">
-																<div
-																	className={`w-3 h-3 rounded-full mr-2 ${
-																		tool.enabled ? 'bg-green-500' : 'bg-gray-300'
-																	}`}
-																></div>
-																<span className="text-sm font-medium text-gray-800 truncate" title={tool.name}>
-																	{tool.name}
-																</span>
-															</div>
-															<p className="text-xs text-gray-500 ml-5 mt-1 truncate" title={tool.description}>
-																{tool.description}
-															</p>
-														</div>
-														<div className="relative">
-															<input
-																type="checkbox"
-																className="sr-only"
-																checked={tool.enabled}
-																onChange={() => toggleTool(tool)}
-															/>
-															<div
-																className={`block w-10 h-5 rounded-full transition-colors ${
-																	tool.enabled ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-gray-300'
-																}`}
-															></div>
-															<div
-																className={`absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full transition-transform shadow ${
-																	tool.enabled ? 'transform translate-x-5' : ''
-																}`}
-															></div>
-														</div>
-													</div>
-												))}
-											</div>
-										</div>
-									)}
-								</div>
+								{/* MCP工具按钮 */}
+								<McpToolSelect />
 							</div>
 							{/* 右侧按钮组 */}
 							<div className="flex items-center pr-2">
+								{/* 上传图标 */}
+								<input
+									ref={fileInputRef}
+									type="file"
+									multiple
+									accept=".txt,.md,.json,.log,.xml,.js,.ts,.py,.html,.css,.java,.c,.cpp,.go,.rs,.sh,.yml,.yaml,.ini,.conf"
+									onChange={handleFileChange}
+									className="hidden"
+								/>
+								<button
+									type="button"
+									onClick={handleOpenFilePicker}
+									title="上传文件（加入对话上下文）"
+									aria-label="上传文件"
+									className="flex items-center justify-center w-9 h-9 mr-2 rounded-lg border bg-gray-100 border-gray-300 text-gray-600 hover:text-gray-500 hover:bg-gray-50 transition-colors"
+								>
+									{isUploading ? <LoadingIcon cls="h-5 w-5" /> : <UploadIcon cls="h-5 w-5" />}
+								</button>
 								{/* 发送/停止按钮 */}
 								{isProcessing ? (
 									<button
@@ -579,8 +272,14 @@ const ChatInterface: React.FC<any> = () => {
 					<div className="flex items-center">
 						<span className="mr-2">当前配置:</span>
 						<span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md text-xs">{selectedModel}</span>
+						{thinking && (
+							<span className="bg-green-100 text-green text-en-800 px-2 py-0.5 rounded-md text-xs ml-1">深度思考</span>
+						)}
 						{webSearch && (
 							<span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-md text-xs ml-1">联网搜索</span>
+						)}
+						{knowledge && (
+							<span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md text-xs ml-1">知识库</span>
 						)}
 						<span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md text-xs ml-1">
 							{enabledToolsCount}个工具

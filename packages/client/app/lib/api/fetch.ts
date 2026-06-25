@@ -27,10 +27,7 @@ export const apiFetch = async (url: string | URL | Request, method: any, options
 			config.body = JSON.stringify(body)
 		}
 		if (method === 'GET' || method === 'DELETE') {
-			url += '?'
-			Object.entries(body).forEach(([k, v]: [string, any]) => {
-				url += `${k}=${v}&`
-			})
+			url += '?' + new URLSearchParams(body).toString() 
 		}
 	}
 	try {

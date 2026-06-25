@@ -23,16 +23,16 @@ const Modal: React.FC<ModalProps> = ({
 	className = 'max-w-md'
 }) => {
 	const { generateId, stack, pushStack, removeStack } = useStackStore()
-  const stackId = useRef<string>(`modal-${generateId()}`).current
+	const stackId = useRef<string>(`modal-${generateId()}`).current
 	const modalRef = useRef<HTMLDivElement>(null)
 	const portalRoot = useRef<HTMLElement | null>(null)
 
 	// 创建稳定的关闭函数引用
-	const closeSelf = ()=>{
-    onClose()
-  }
-  
-  // 向堆栈中添加关闭事件
+	const closeSelf = () => {
+		onClose()
+	}
+
+	// 向堆栈中添加关闭事件
 	useEffect(() => {
 		if (isOpen) {
 			pushStack({

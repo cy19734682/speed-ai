@@ -9,10 +9,13 @@ type GeneralStore = {
 	isModalMcpOpen: boolean
 	// AI助手面板开启状态
 	isModalAssistantOpen: boolean
+	// 知识库面板开启状态
+	isModalKnowledgeOpen: boolean
 	setIsSidebarOpen: (open: boolean) => void
 	setIsModalSettingOpen: (open: boolean) => void
 	setIsModalMcpOpen: (open: boolean) => void
 	setIsModalAssistantOpen: (open: boolean) => void
+	setIsModalKnowledgeOpen: (open: boolean) => void
 }
 
 /**
@@ -23,6 +26,7 @@ export const useGeneralStore = create<GeneralStore>()((set) => ({
 	isModalSettingOpen: false,
 	isModalMcpOpen: false,
 	isModalAssistantOpen: false,
+	isModalKnowledgeOpen: false,
 	setIsSidebarOpen: (open) =>
 		set((state) => {
 			state.isModalSettingOpen = false
@@ -44,5 +48,10 @@ export const useGeneralStore = create<GeneralStore>()((set) => ({
 		set((state) => {
 			state.isSidebarOpen = false
 			return { isModalAssistantOpen: open }
+		}),
+	setIsModalKnowledgeOpen: (open) =>
+		set((state) => {
+			state.isSidebarOpen = false
+			return { isModalKnowledgeOpen: open }
 		})
 }))

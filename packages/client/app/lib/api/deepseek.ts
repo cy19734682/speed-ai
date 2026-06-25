@@ -3,6 +3,7 @@ import { formatMcpSchemaTool, handleDeepseekResponse, replyFormat } from '@/app/
 import { config } from '@/app/lib/config'
 import { initMcpClient } from '@/app/lib/mcp-service'
 import { nameConversation, structureToolAction } from '@/app/lib/prompts'
+import { getKB } from '@/app/lib/langchain'
 
 /**
  * 处理自动生成标题
@@ -12,9 +13,40 @@ import { nameConversation, structureToolAction } from '@/app/lib/prompts'
 const autoGenerateTitle = async (messages: any, options: Record<string, any> = {}): Promise<any> => {
 	const { autoTitle } = options
 	if (autoTitle) {
-		options.model = config.ai.defaultModel
+		options.model = config.ds.defaultModel
 		options.thinking = false
 		messages[0].content = nameConversation(messages[0].content)
+	}
+}
+
+/**
+ * 基于本地知识库检索相关上下文
+ * 仅当 options.knowledge === true 时调用；知识库通过向量检索返回内容片段
+ */
+const retrieveKnowledgeContext = async (messages: any, topK = 4): Promise<Record<string, any>> => {
+	try {
+		const query = [...messages].reverse().find((m: any) => m.role === 'user')?.content
+		if (!query || typeof query !== 'string') return []
+		const kb = await getKB()
+		const results: any[] = await kb.searchContext(query, topK)
+		if (results?.length === 0) {
+			return {
+				context: '',
+				results: []
+			}
+		}
+		const contextStrings = results.map((item, index) => {
+			const name = item.metadata?.name || item.metadata?.source || '未知来源'
+			return `[${index + 1}] 来源: ${name} (相关度: ${Number(item.score.toFixed(4))})\n${item.content}`
+		})
+		const context = `以下是知识库中与您问题相关的资料（请结合这些信息回答，若知识库中没有相关内容则按一般常识回答）：\n${contextStrings.join('\n\n')}`
+		return {
+			context,
+			results
+		}
+	} catch (e) {
+		console.warn('[知识库检索] 失败：', e)
+		return {}
 	}
 }
 
@@ -33,6 +65,7 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 		webSearch,
 		searchTool,
 		thinking = false,
+		knowledge = false,
 		abortCtrl
 	} = options
 	// 处理联网搜索
@@ -57,9 +90,9 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 
 	// 创建DeepSeek模型
 	const createChatModel = async () => {
-		return await apiFetch(config.ai.deepseekApiUrl, 'POST', {
+		return await apiFetch(config.ds.apiUrl, 'POST', {
 			body: {
-				model: model || config.ai.defaultModel,
+				model: model || config.ds.defaultModel,
 				messages,
 				temperature,
 				max_tokens: maxTokens,
@@ -77,6 +110,21 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 
 	// 处理轮次
 	let round = 0
+
+	// 知识库检索
+	if (knowledge) {
+		controller.enqueue(replyFormat('knowledge', { index: round, content: { type: 'start' } }))
+
+		const { context, results = [] } = await retrieveKnowledgeContext(messages, 5)
+		if (context && results?.length > 0) {
+			messages.unshift({
+				role: 'system',
+				content: context
+			})
+		}
+		controller.enqueue(replyFormat('knowledge', { index: round, content: { type: 'end', results } }))
+		round++
+	}
 
 	// 处理DeepSeek API调用
 	while (true) {
@@ -205,7 +253,6 @@ export const createDeepSeekChat = async (messages: any, options: Record<string, 
 				console.error('流处理出错:', error)
 				controller.error(error)
 			} finally {
-				console.log('[DEBUG] ReadableStream finally block executed')
 				controller.close()
 			}
 		}

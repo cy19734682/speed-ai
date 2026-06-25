@@ -9,14 +9,14 @@ import { MCP_STORE_KEY, WEB_SEARCH_KEY } from '@/app/lib/constant'
 const defaultState = {
 	searchTool: {
 		id: WEB_SEARCH_KEY,
-    code: WEB_SEARCH_KEY,
-    name: '联网搜索',
-    url: '',
-    tag: '联网',
-    description: '',
-    accessToken: '',
+		code: WEB_SEARCH_KEY,
+		name: '联网搜索',
+		url: '',
+		tag: '联网',
+		description: '',
+		accessToken: '',
 		tool: '',
-    enabled: false
+		enabled: false
 	},
 	tools: []
 }

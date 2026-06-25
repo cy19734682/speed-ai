@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useGeneralStore, useChatStore } from '../store'
 import useChatList from '../hooks/useChatList'
 import { ChatMessages, MenuItem, PaginatedGroup } from '@/app/lib/type'
-import { AddRoundIcon, ChatSettingIcon, McpIcon, PartnerIcon, RightMenuIcon } from '@/app/styles/SvgIcon'
+import { AddRoundIcon, ChatSettingIcon, McpIcon, PartnerIcon, RightMenuIcon, KnowledgeIcon } from '@/app/styles/SvgIcon'
 import { useConfirm } from '@/app/components/commons/Confirm'
 import { useToast } from '@/app/components/commons/Toast'
 
@@ -13,7 +13,7 @@ import { useToast } from '@/app/components/commons/Toast'
 const ChatListPanel: React.FC = () => {
 	const { confirm } = useConfirm()
 	const toast = useToast()
-	const { setIsModalSettingOpen, setIsModalMcpOpen, setIsModalAssistantOpen } = useGeneralStore()
+	const { setIsModalSettingOpen, setIsModalMcpOpen, setIsModalAssistantOpen, setIsModalKnowledgeOpen } = useGeneralStore()
 	const { updateMessageTitle } = useChatStore()
 	const { chatGroups, currentChatId, updateCurrentChatId, removeMessage, createCurrentChatId } = useChatList()
 
@@ -54,7 +54,7 @@ const ChatListPanel: React.FC = () => {
 			if (isEditing && inputRef.current) {
 				inputRef.current.focus()
 			}
-		}, [isEditing])
+		}, [isEditing])	
 
 		// 获取菜单项样式
 		const getMenuItemStyle = (type = '') => {
@@ -235,6 +235,13 @@ const ChatListPanel: React.FC = () => {
 				>
 					<PartnerIcon cls="h-5 w-5 mr-2 text-gray-600 " />
 					<span>我的搭档</span>
+				</div>
+				<div
+					className="text-sm px-3 py-2 text-gray-900 rounded-md hover:bg-gray-100 flex items-center cursor-pointer"
+					onClick={() => setIsModalKnowledgeOpen(true)}
+				>
+					<KnowledgeIcon cls="h-5 w-5 mr-2" />
+					<span>知识库</span>
 				</div>
 				<div
 					className="text-sm px-3 py-2 text-gray-900 rounded-md hover:bg-gray-100 flex items-center cursor-pointer"

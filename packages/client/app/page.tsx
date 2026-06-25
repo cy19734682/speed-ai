@@ -6,6 +6,7 @@ import ChatListPanel from '@/app/components/ChatListPanel'
 import ChatSettingsModel from '@/app/components/ChatSettingsModel'
 import McpSettingsModel from '@/app/components/McpSettingsModel'
 import ChatAssistantModel from '@/app/components/ChatAssistantModel'
+import KnowledgeModel from '@/app/components/KnowledgeModel'
 import { useGeneralStore } from '@/app/store'
 import { CloseIcon, MobileMenuIcon } from '@/app/styles/SvgIcon'
 
@@ -48,6 +49,8 @@ export default function Home() {
 			<McpSettingsModel />
 			{/*助手*/}
 			<ChatAssistantModel />
+			{/*知识库*/}
+			<KnowledgeModel />
 		</AppProviders>
 	)
 }

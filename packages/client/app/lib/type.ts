@@ -6,6 +6,12 @@ export interface ChatStore {
 	messages: ChatMessages[]
 	// 对话历史列表
 	historys: ChatDetail[]
+	// 联网搜索
+	webSearch: boolean
+	// 深度思考
+	thinking: boolean
+	// 知识库（本地向量检索）
+	knowledge: boolean
 	// 当前对话ID
 	currentChatId: string | null
 	// 当前AI助手ID(不需要持久化)
@@ -14,6 +20,12 @@ export interface ChatStore {
 	currentChatData: ChatMessages | null
 	// 更新对话设置
 	updateSetting: (prefs: Partial<ChatStore['setting']>) => void
+	// 更新联网搜索
+	updateWebSearch: (webSearch: boolean) => void
+	// 更新深度思考
+	updateThinking: (thinking: boolean) => void
+	// 更新知识库开关
+	updateKnowledge: (knowledge: boolean) => void
 	// 添加消息
 	addMessage: (newItem: ChatMessages) => void
 	// 移除消息
@@ -124,6 +136,15 @@ export interface Tool {
 	name: string
 	description: string
 	input_schema: any
+}
+
+// 知识库
+export interface Knowledge {
+	id: string
+	name: string
+	content: string
+	updatedAt?: string
+	[x: string]: any
 }
 
 export interface DeepSeekTool {

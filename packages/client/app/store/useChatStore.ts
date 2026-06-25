@@ -19,13 +19,16 @@ import {
  **/
 const defaultState = {
 	setting: {
-		model: config.ai.defaultModel,
+		model: config.ds.defaultModel,
 		temperature: 0.8,
 		maxTokens: 2048,
 		contextDeep: 5
 	},
 	messages: [],
 	historys: [],
+	webSearch: false,
+	thinking: false,
+	knowledge: false,
 	currentChatId: null,
 	// 当前角色ID(不需要持久化)
 	currentRoleId: null,
@@ -62,6 +65,12 @@ export const useChatStore: any = create<ChatStore>()(
 				set({
 					setting: { ...get().setting, ...prefs }
 				}),
+			// 更新联网搜索
+			updateWebSearch: (webSearch: boolean) => set({ webSearch }),
+			// 更新深度思考
+			updateThinking: (thinking: boolean) => set({ thinking }),
+			// 更新知识库开关
+			updateKnowledge: (knowledge: boolean) => set({ knowledge }),
 			// 创建当前聊天ID
 			createCurrentChatId: () => {
 				// 生成唯一ID

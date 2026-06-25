@@ -138,8 +138,8 @@ const McpSettingsModel: React.FC<any> = () => {
 					return toast.warning('URL格式不正确')
 				}
 				const ret = await apiFetch('/api/tools', 'POST', { body: mcpTool })
-				const tool = await ret.json()
-				setChildTools(tool)
+				const { data } = await ret.json()
+				setChildTools(data?.tools || [])
 				setTimeout(() => {
 					toolListRef.current?.scrollIntoView({ behavior: 'smooth' })
 				}, 100)

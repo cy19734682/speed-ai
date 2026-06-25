@@ -38,7 +38,7 @@ const handlerSearchResult = async (
 				],
 				{
 					...options,
-					model: config.ai.defaultModel,
+					model: config.ds.defaultModel,
 					tools: undefined
 				}
 			)
@@ -116,7 +116,7 @@ const handlerMcpToolResult = async (
 				],
 				{
 					...options,
-					model: config.ai.defaultModel,
+					model: config.ds.defaultModel,
 					tools: formatMcpSchemaTool(funcTools)
 				}
 			)
@@ -172,7 +172,7 @@ const handlerMcpToolResult = async (
 const autoGenerateTitle = async (messages: any, options: Record<string, any> = {}): Promise<any> => {
 	const { autoTitle } = options
 	if (autoTitle) {
-		options.model = config.ai.defaultModel
+		options.model = config.ds.defaultModel
 		messages[0].content = nameConversation(messages[0].content)
 	}
 }
@@ -241,9 +241,9 @@ export const createDeepSeekChatStream = async (
 	options: Record<string, any> = {}
 ): Promise<ReadableStream> => {
 	const { model, temperature = 0.7, maxTokens = 2048, tools } = options
-	const response: any = await apiFetch(config.ai.deepseekApiUrl, 'POST', {
+	const response: any = await apiFetch(config.ds.apiUrl, 'POST', {
 		body: {
-			model: model || config.ai.defaultModel,
+			model: model || config.ds.defaultModel,
 			messages,
 			temperature,
 			max_tokens: maxTokens,
@@ -272,9 +272,9 @@ export const createDeepSeekChatResponse = async (
 	options: Record<string, any> = {}
 ): Promise<object> => {
 	const { model, temperature = 0.7, maxTokens = 2048, tools = [] } = options
-	const response: any = await apiFetch(config.ai.deepseekApiUrl, 'POST', {
+	const response: any = await apiFetch(config.ds.apiUrl, 'POST', {
 		body: {
-			model: model || config.ai.defaultModel,
+			model: model || config.ds.defaultModel,
 			messages,
 			tools: tools?.length > 0 ? tools : undefined,
 			temperature,

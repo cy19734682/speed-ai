@@ -1,13 +1,12 @@
+import type React from 'react'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { apiFetch } from '@/app/lib/api/fetch'
-import { handleResponse } from '@/app/lib/util'
+import { handleResponse, UUID } from '@/app/lib/util'
 import { useChatStore, useMcpStore, useChatAssistantStore } from '@/app/store'
-import { ChatMessages, ChatDetail, McpTool, Assistant } from '@/app/lib/type'
-import { models } from '@/app/lib/constant'
-import { useToast } from '@/app/components/commons/Toast'
+import { ChatMessages, ChatDetail, Assistant, Knowledge } from '@/app/lib/type'
+import { useMcpToolSelect } from '@/app/components/chat/McpToolSelect'
 
 export default function useChatContent() {
-	const toast = useToast()
 	const {
 		setting,
 		messages,
@@ -15,7 +14,6 @@ export default function useChatContent() {
 		currentChatData,
 		currentChatId,
 		currentRoleId,
-		updateSetting,
 		addMessage,
 		addMessageChild,
 		updateMessageChild,
@@ -24,36 +22,26 @@ export default function useChatContent() {
 		updateCurrentRoleId,
 		loadMessages
 	} = useChatStore()
-	const { tools, searchTool, updateTool, updateAllTool } = useMcpStore()
+	const { webSearch, thinking, knowledge, mcpList } = useMcpToolSelect()
+	const { searchTool } = useMcpStore()
 	const { assistants } = useChatAssistantStore()
 
 	const [inputValue, setInputValue] = useState('')
 	const [isProcessing, setIsProcessing] = useState(false)
 	const [error, setError] = useState<string | null>(null)
-	const [webSearch, setWebSearch] = useState<boolean>(false)
-	const [thinking, setThinking] = useState<boolean>(false)
-	const [selectedModel, setSelectedModel] = useState<string>(models[0]?.value || '')
-	const [isToolsOpen, setIsToolsOpen] = useState<boolean>(false)
-	const [isModelMenuOpen, setIsModelMenuOpen] = useState<boolean>(false)
-	const [mcpList, setMcpList] = useState<McpTool[]>([])
-	const [assistantData, setAssistantData] = useState<Assistant | null>(null)
+	const [assistantData, setAssistantData] = useState<any | null>(null)
+	const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
+	const [isUploading, setIsUploading] = useState(false)
+	const fileInputRef = useRef<HTMLInputElement>(null)
 
 	const abortControllerRef = useRef<any>(null)
 	// 顶部可见元素
 	const messagesTopRef = useRef<HTMLDivElement>(null)
 	// 底部可见元素
 	const messagesEndRef = useRef<HTMLDivElement>(null)
-	// 按钮元素引用(不使用useState的原因是messagesTopRef/messagesEndRef组件和列表位于同一父元素，会频繁重新渲染)
+	// 按钮元素引用
 	const scrollTopButtonRef = useRef<HTMLButtonElement>(null)
 	const scrollBottomButtonRef = useRef<HTMLButtonElement>(null)
-	// 模型选择按钮元素
-	const modelButtonRef = useRef<HTMLButtonElement>(null)
-	// 模型选择按钮元素
-	const modelMenuRef = useRef<HTMLDivElement>(null)
-	// 工具按钮元素
-	const toolsButtonRef = useRef<HTMLButtonElement>(null)
-	// 工具弹窗元素
-	const toolsRef = useRef<HTMLDivElement>(null)
 	// 输入框元素
 	const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -68,56 +56,27 @@ export default function useChatContent() {
 	 * 当前角色ID变化时新建会话并将AI助手加入对话中
 	 */
 	useEffect(() => {
-		const assData = assistants?.find?.((item: Assistant) => item.id === currentRoleId) || null
+		const assData: any = assistants?.find?.((item: Assistant) => item.id === currentRoleId) || null
 		if (assData) {
 			setAssistantData(assData)
 		} else {
 			setAssistantData(null)
 		}
-	}, [currentRoleId])
+	}, [currentRoleId, assistants])
 
 	/**
 	 * 会话名称自动生成
 	 */
 	useEffect(() => {
-		const chat = useChatStore.getState().messages?.find?.((item: ChatMessages) => item.chatId === currentChatId) || null
-		const isNeedGenerateTitle = useChatStore
+		const chat =
+			(useChatStore as any).getState().messages?.find?.((item: ChatMessages) => item.chatId === currentChatId) || null
+		const isNeedGenerateTitle = (useChatStore as any)
 			.getState()
 			.historys?.some?.((item: ChatDetail) => item.role === 'assistant' && item.createdAt)
 		if (!isProcessing && isNeedGenerateTitle && !chat?.isAutoTitle) {
 			autoGenerateTitle().then()
 		}
 	}, [currentChatId, isProcessing])
-
-	/**
-	 * 初始化持久化状态中的对话设置
-	 */
-	useEffect(() => {
-		setSelectedModel(setting.model)
-	}, [setting])
-
-	/**
-	 * MCP联网搜索中禁用了搜索后，重置webSearch
-	 */
-	useEffect(() => {
-		if (!searchTool?.enabled) {
-			setWebSearch(false)
-		}
-	}, [searchTool])
-
-	/**
-	 * 初始化持久化状态中的工具列表
-	 */
-	useEffect(() => {
-		setMcpList(tools)
-	}, [tools])
-
-	/**
-	 * 计算启用的工具数量
-	 */
-	const enabledToolsCount = useMemo(() => {
-		return mcpList.filter((tool) => tool.enabled).length || 0
-	}, [mcpList])
 
 	/**
 	 * 判断是否是新消息
@@ -128,35 +87,18 @@ export default function useChatContent() {
 	}, [messages, currentChatId])
 
 	/**
-	 * 当前模型对象
-	 */
-	const currentModel: any = useMemo(() => {
-		return models.find((item) => item.value === selectedModel) || {}
-	}, [selectedModel])
-
-	/**
-	 * 判断当前模式是否本身支持思考，支持则设置thinking为true
-	 */
-	useEffect(() => {
-		if (currentModel?.isThink) {
-			setThinking(true)
-		}
-	}, [currentModel])
-
-	/**
 	 * 消息变化时滚动到底部并保存消息
 	 */
 	useEffect(() => {
 		setTimeout(() => {
 			messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
 		}, 100)
-	}, [messages])
+	}, [historys])
 
 	/**
 	 * 监听滚动事件
 	 */
 	useEffect(() => {
-		// 创建第一个观察器
 		const observer1 = new IntersectionObserver(([entry]) => {
 			requestAnimationFrame(() => {
 				const shouldShow = !entry.isIntersecting
@@ -165,7 +107,6 @@ export default function useChatContent() {
 				}
 			})
 		})
-		// 创建第二个观察器
 		const observer2 = new IntersectionObserver(([entry]) => {
 			requestAnimationFrame(() => {
 				const shouldShow = !entry.isIntersecting
@@ -179,46 +120,6 @@ export default function useChatContent() {
 		return () => {
 			if (messagesTopRef.current) observer1.unobserve(messagesTopRef.current)
 			if (messagesEndRef.current) observer2.unobserve(messagesEndRef.current)
-		}
-	}, [])
-
-	/**
-	 * 点击外部关闭工具列表
-	 */
-	useEffect(() => {
-		const handleClickOutside = (event: any) => {
-			if (
-				toolsRef.current &&
-				!toolsRef.current.contains(event.target) &&
-				toolsButtonRef.current &&
-				!toolsButtonRef.current.contains(event.target)
-			) {
-				setIsToolsOpen(false)
-			}
-		}
-		document.addEventListener('mousedown', handleClickOutside)
-		return () => {
-			document.removeEventListener('mousedown', handleClickOutside)
-		}
-	}, [])
-
-	/**
-	 * 点击外部关闭模型选择列表
-	 */
-	useEffect(() => {
-		const handleClickOutside = (event: any) => {
-			if (
-				modelMenuRef.current &&
-				!modelMenuRef.current.contains(event.target) &&
-				modelButtonRef.current &&
-				!modelButtonRef.current.contains(event.target)
-			) {
-				setIsModelMenuOpen(false)
-			}
-		}
-		document.addEventListener('mousedown', handleClickOutside)
-		return () => {
-			document.removeEventListener('mousedown', handleClickOutside)
 		}
 	}, [])
 
@@ -250,12 +151,14 @@ export default function useChatContent() {
 	 * 根据内容自动生成标题
 	 */
 	const autoGenerateTitle = async () => {
-		// 直接访问 store 实例 获取最新状态
-		const chat = useChatStore.getState().messages?.find?.((item: ChatMessages) => item.chatId === currentChatId) || null
+		const chat =
+			(useChatStore as any).getState().messages?.find?.((item: ChatMessages) => item.chatId === currentChatId) || null
 		let lineBuffer = ''
 		try {
-			const userContent = useChatStore.getState().historys?.find((item: ChatDetail) => item.role === 'user')?.content
-			const assistantContent = useChatStore
+			const userContent = (useChatStore as any)
+				.getState()
+				.historys?.find((item: ChatDetail) => item.role === 'user')?.content
+			const assistantContent = (useChatStore as any)
 				.getState()
 				.historys.find((item: ChatDetail) => item.role === 'assistant')?.content
 			if (!userContent || !assistantContent) {
@@ -265,7 +168,6 @@ export default function useChatContent() {
 				role: 'user',
 				content: `USER: ${userContent} \n\nAssistant: ${assistantContent?.slice(0, 400)} \n\n`
 			}
-			// 将消息发送到 API
 			const response: any = await apiFetch('/api/chat', 'POST', {
 				method: 'POST',
 				body: {
@@ -285,31 +187,72 @@ export default function useChatContent() {
 					updateMessageTitle(chat.chatId, lineBuffer)
 				}
 			})
-		} catch (error: any) {
-			setError('自动生成标题失败：' + error.message)
+		} catch (err: any) {
+			setError('自动生成标题失败：' + err.message)
 		} finally {
-			updateMessageTitle(chat.chatId, lineBuffer, true)
+			if (chat) {
+				updateMessageTitle(chat.chatId, lineBuffer, true)
+			}
 		}
 	}
 
 	/**
 	 * 处理键盘事件
-	 * @param e
 	 */
 	const handleKeyDown = async (e: any) => {
-		// 忽略输入法编辑状态（中文输入时不触发）
 		if (e.nativeEvent.isComposing) {
 			return
 		}
 		if (e.key === 'Enter') {
-			// Shift + Enter：换行，不阻止默认行为
 			if (e.shiftKey) {
-				return // 浏览器自动插入换行符
+				return
 			}
-			// 纯 Enter：发送消息
-			e.preventDefault() // 阻止默认换行
+			e.preventDefault()
 			await handleSendMessage()
 		}
+	}
+
+	/**
+	 * 打开文件选择器
+	 */
+	const handleOpenFilePicker = () => {
+		fileInputRef.current?.click()
+	}
+
+	/**
+	 * 处理文件选择并上传
+	 */
+	const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const files = e.target.files
+		if (!files || files.length === 0) return
+		setIsUploading(true)
+		try {
+			const newFiles: any[] = []
+			for (let i = 0; i < files.length; i++) {
+				const file = files[i]
+				const text = await file.text()
+				newFiles.push({
+					id: UUID(),
+					content: text,
+					name: file.name,
+					size: file.size,
+					type: file.type
+				})
+			}
+			setUploadedFiles((prev) => [...prev, ...newFiles])
+		} catch (err: any) {
+			setError('上传文件时发生错误：' + err.message)
+		} finally {
+			setIsUploading(false)
+			if (fileInputRef.current) fileInputRef.current.value = ''
+		}
+	}
+
+	/**
+	 * 移除已上传的文件
+	 */
+	const handleRemoveFile = (id: string) => {
+		setUploadedFiles((prev) => prev.filter((f) => f.id !== id))
 	}
 
 	/**
@@ -317,14 +260,27 @@ export default function useChatContent() {
 	 */
 	const handleSendMessage = async () => {
 		if (!inputValue.trim() || isProcessing) return
-		const userMessage = inputValue.trim()
+		let userMessage = inputValue.trim()
+		const shortcutTitle = inputValue.trim()
+		if (uploadedFiles.length > 0) {
+			const contexts: string[] = []
+			for (let i = 0; i < uploadedFiles.length; i++) {
+				const fname = uploadedFiles[i].name ? `【文件：${uploadedFiles[i].name}】` : ''
+				contexts.push(`${fname}\n${uploadedFiles[i].content}`)
+			}
+			const fileContext = `\n---\n以下是用户上传的文件内容（供参考）：\n${contexts.join('\n---\n')}\n---\n请结合上述文件内容回答用户问题。`
+			userMessage += fileContext
+		}
+
 		setInputValue('')
 		setIsProcessing(true)
 		const msgList: any[] = [
 			{
 				role: 'user',
 				createdAt: new Date().toISOString(),
-				content: userMessage
+				shortcutTitle,
+				content: userMessage,
+				files: uploadedFiles
 			},
 			{
 				role: 'assistant',
@@ -338,16 +294,16 @@ export default function useChatContent() {
 			const newMessage: ChatMessages = {
 				chatId: currentChatId,
 				createdAt: new Date().toISOString(),
-				title: userMessage,
+				title: shortcutTitle,
 				isAutoTitle: false
 			}
 			addMessage(newMessage)
 			if (assistantData) {
-				// 拼接助手提示
+				// 拼接助手提示（来自知识库，作为 system prompt）
 				msgList.unshift({
 					role: 'system',
 					createdAt: new Date().toISOString(),
-					content: assistantData.prompt
+					content: (assistantData as Knowledge).content || `您是一名专业的助手，擅长使用知识库中的信息回答问题。`
 				})
 			}
 		}
@@ -356,14 +312,17 @@ export default function useChatContent() {
 		})
 		// 开始对话后去掉所选择的助手
 		clearAssistantData()
+		// 清空已上传的文件
+		setUploadedFiles([])
 		let lineBuffer = ''
 		let lineThinkBuffer = ''
 		const messageList: any[] = []
-		const chatHistorys: ChatDetail[] = useChatStore.getState().historys?.slice?.(0, -1) || []
+		const chatHistorys: ChatDetail[] = (useChatStore as any).getState().historys?.slice?.(0, -1) || []
 		try {
 			const history = chatHistorys.map?.((e: ChatDetail) => ({ role: e.role, content: e.content })) || []
 			abortControllerRef.current = new AbortController()
-			// 将消息发送到 API
+
+			// 发送消息到 API，携带知识库开关、searchTool 等
 			const response: any = await apiFetch('/api/chat', 'POST', {
 				method: 'POST',
 				controller: abortControllerRef.current,
@@ -373,7 +332,8 @@ export default function useChatContent() {
 						webSearch,
 						searchTool,
 						thinking,
-						tools: mcpList.filter((item: McpTool) => item.enabled),
+						knowledge,
+						tools: mcpList.filter((item: any) => item.enabled),
 						model: setting.model,
 						temperature: setting.temperature,
 						maxTokens: setting.maxTokens
@@ -388,21 +348,12 @@ export default function useChatContent() {
 						lineBuffer = ''
 						messageList.push({})
 					}
-					/**
-					 * type 类型
-					 * 普通对话：middle
-					 * 深度思考：think
-					 * 思考时间：time
-					 * 联网搜索结果：search
-					 * 工具调用结果：tools
-					 */
 					if (data.type === 'think') {
 						lineThinkBuffer += content
 						messageList[index][data.type] = lineThinkBuffer
 					} else if (data.type === 'middle') {
 						lineBuffer += content
 						messageList[index][data.type] = lineBuffer
-						// 将AI正式回答写入缓存，方便后续使用
 						updateMessageChild({ content: lineBuffer })
 					} else {
 						messageList[index][data.type] = content
@@ -410,8 +361,8 @@ export default function useChatContent() {
 					updateMessageChild({ contents: messageList })
 				}
 			})
-		} catch (error: any) {
-			setError(error.message)
+		} catch (err: any) {
+			setError(err.message)
 			if (messageList?.length === 0) {
 				messageList.push({})
 			}
@@ -419,11 +370,9 @@ export default function useChatContent() {
 			messageList[messageList.length - 1].middle = errorContent
 			updateMessageChild({ contents: messageList, content: errorContent })
 		} finally {
-			//请求结束
 			setIsProcessing(false)
 			const lastMessage: any = { createdAt: new Date().toISOString() }
 			updateMessageChild(lastMessage)
-			// 保存子消息持久化
 			saveMessageChild(currentChatId, lastMessage)
 		}
 	}
@@ -433,44 +382,6 @@ export default function useChatContent() {
 	 */
 	const handleCancel = () => {
 		abortControllerRef.current?.abort?.()
-	}
-
-	/**
-	 * 切换工具启用状态
-	 */
-	const toggleTool = (tool: McpTool) => {
-		updateTool(tool.id, { ...tool, enabled: !tool.enabled })
-	}
-
-	/**
-	 * 切换联网搜索状态
-	 */
-	const toggleWenSearch = () => {
-		if (!searchTool?.enabled) {
-			return toast.warning('请先在MCP配置中启用联网搜索！')
-		}
-		setWebSearch(!webSearch)
-	}
-
-	/**
-	 * 切换思考模式状态
-	 */
-	const toggleThinking = () => {
-		setThinking(!thinking)
-	}
-
-	/**
-	 * 选择模型
-	 */
-	const selectModel = (model: string) => {
-		updateSetting({ ...setting, model })
-	}
-
-	/**
-	 * 全选或取消所有工具
-	 */
-	const disEnableAllTools = (enabled: boolean) => {
-		updateAllTool(mcpList.map((tool) => ({ ...tool, enabled })))
 	}
 
 	/**
@@ -490,21 +401,12 @@ export default function useChatContent() {
 		isProcessing,
 		scrollTopButtonRef,
 		scrollBottomButtonRef,
-		setting,
-		webSearch,
-		thinking,
-		toolsRef,
-		selectedModel,
-		isToolsOpen,
-		mcpList,
-		enabledToolsCount,
-		isModelMenuOpen,
-		modelButtonRef,
-		modelMenuRef,
-		toolsButtonRef,
 		textareaRef,
 		assistantData,
-		currentModel,
+		uploadedFiles,
+		isUploading,
+		fileInputRef,
+		knowledge,
 		setInputValue,
 		setIsProcessing,
 		setError,
@@ -513,13 +415,9 @@ export default function useChatContent() {
 		handleCancel,
 		scrollToTop,
 		scrollToBottom,
-		toggleWenSearch,
-		toggleThinking,
-		selectModel,
-		setIsToolsOpen,
-		disEnableAllTools,
-		toggleTool,
-		setIsModelMenuOpen,
-		clearAssistantData
+		clearAssistantData,
+		handleOpenFilePicker,
+		handleFileChange,
+		handleRemoveFile
 	}
 }
