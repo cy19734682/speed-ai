@@ -139,6 +139,11 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 			if (!startTime) {
 				startTime = Date.now()
 			}
+			const finishReason = delta?.finish_reason || ''
+			if (finishReason === 'length' || finishReason === 'content_filter') {
+				// 模型停止生成 token 的原因
+				controller.enqueue(replyFormat('finish', { index: round, content: finishReason }))
+			}
 			const reasoningContent = delta?.reasoning_content || ''
 			if (reasoningContent) {
 				if (!isThinking) {

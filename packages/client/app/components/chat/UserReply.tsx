@@ -1,11 +1,11 @@
-import React, { useState, useRef } from 'react'
+import React from 'react'
 import { ChatDetail } from '@/app/lib/type'
-
 interface HTMLPreviewProps {
 	message: ChatDetail
+	setModalData: (data: any) => void
 }
 
-const UserReplyContent: React.FC<HTMLPreviewProps> = ({ message }) => {
+const UserReplyContent: React.FC<HTMLPreviewProps> = ({ message, setModalData }) => {
 	const files = message.files
 	const shortcutTitle = message.shortcutTitle
 	const content = message.content
@@ -20,7 +20,12 @@ const UserReplyContent: React.FC<HTMLPreviewProps> = ({ message }) => {
 							className="flex items-center gap-1 px-2 py-1 text-xs bg-indigo-50 text-gray-700 rounded-md border border-indigo-100"
 							title={file.name}
 						>
-							<span className="max-w-[140px] truncate">{file.name}</span>
+							<span
+								className="max-w-[140px] truncate cursor-pointer hover:underline"
+								onClick={() => setModalData(file)}
+							>
+								{file.name}
+							</span>
 						</div>
 					))}
 				</div>

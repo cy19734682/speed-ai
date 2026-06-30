@@ -38,7 +38,9 @@ export const handleResponse = async (response: any, onMessages: (arg0: any) => v
 		//  AbortController 主动取消会走到这里
 		if (readerErr.name === 'AbortError') {
 			console.log('~~~请求被主动取消~~~~')
-			return
+			const abortErr = new Error('用户取消请求')
+			abortErr.name = 'AbortError'
+			throw abortErr
 		}
 		// 其他 reader 异常继续抛，让外层 finally 处理
 		throw readerErr
@@ -137,9 +139,10 @@ function processSseEvent(dataStr: string, onMessages: (arg0: any) => void) {
 			const choices = processedData.choices
 			if (Array.isArray(choices) && choices.length > 0) {
 				const delta = choices[0]?.delta
+				const finish_reason = choices[0]?.finish_reason
 				// delta 可能是空对象（流式开始/结束时的占位），也可能为 undefined
-				if (delta && (delta.content || delta.reasoning_content || delta.tool_calls)) {
-					onMessages(delta)
+				if (delta?.content || delta?.reasoning_content || delta?.tool_calls || finish_reason) {
+					onMessages({ ...delta, finish_reason })
 				}
 			}
 		} catch (cbErr: any) {

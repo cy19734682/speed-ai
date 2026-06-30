@@ -73,7 +73,6 @@ export interface ChatSettingIcon {
 	model: string
 	temperature: number
 	maxTokens: number
-	contextDeep: number
 	[x: string]: any
 }
 

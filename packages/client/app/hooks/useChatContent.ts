@@ -183,14 +183,16 @@ export default function useChatContent() {
 			await handleResponse(response, (data: any) => {
 				if (data.result) {
 					const { content } = data.result
-					lineBuffer += content
-					updateMessageTitle(chat.chatId, lineBuffer)
+					if (data.type === 'middle') {
+						lineBuffer += content
+						updateMessageTitle(chat.chatId, lineBuffer)
+					}
 				}
 			})
 		} catch (err: any) {
 			setError('自动生成标题失败：' + err.message)
 		} finally {
-			if (chat) {
+			if (chat?.chatId && lineBuffer) {
 				updateMessageTitle(chat.chatId, lineBuffer, true)
 			}
 		}
@@ -257,68 +259,98 @@ export default function useChatContent() {
 
 	/**
 	 * 处理发送消息
+	 * @param isReSend 是否重新发送
 	 */
-	const handleSendMessage = async () => {
-		if (!inputValue.trim() || isProcessing) return
-		let userMessage = inputValue.trim()
-		const shortcutTitle = inputValue.trim()
-		if (uploadedFiles.length > 0) {
-			const contexts: string[] = []
-			for (let i = 0; i < uploadedFiles.length; i++) {
-				const fname = uploadedFiles[i].name ? `【文件：${uploadedFiles[i].name}】` : ''
-				contexts.push(`${fname}\n${uploadedFiles[i].content}`)
-			}
-			const fileContext = `\n---\n以下是用户上传的文件内容（供参考）：\n${contexts.join('\n---\n')}\n---\n请结合上述文件内容回答用户问题。`
-			userMessage += fileContext
-		}
+	const handleSendMessage = async (isReSend: boolean = false) => {
+		// 防止重复点击
+		if (isProcessing) return
 
-		setInputValue('')
-		setIsProcessing(true)
-		const msgList: any[] = [
-			{
-				role: 'user',
-				createdAt: new Date().toISOString(),
-				shortcutTitle,
-				content: userMessage,
-				files: uploadedFiles
-			},
-			{
-				role: 'assistant',
-				createdAt: '',
-				content: '',
-				contents: []
+		if (isReSend) {
+			// 获取当前历史消息列表
+			const currentHistorys: ChatDetail[] = (useChatStore as any).getState().historys || []
+			// 重新发送：验证历史消息中存在用户消息
+			const hasUserMessage = currentHistorys.some((item: ChatDetail) => item.role === 'user')
+			if (!hasUserMessage) {
+				setError('未找到可重新发送的用户消息')
+				return
 			}
-		]
-		// 新消息
-		if (isNewChat) {
-			const newMessage: ChatMessages = {
-				chatId: currentChatId,
-				createdAt: new Date().toISOString(),
-				title: shortcutTitle,
-				isAutoTitle: false
-			}
-			addMessage(newMessage)
-			if (assistantData) {
-				// 拼接助手提示（来自知识库，作为 system prompt）
-				msgList.unshift({
-					role: 'system',
-					createdAt: new Date().toISOString(),
-					content: (assistantData as Knowledge).content || `您是一名专业的助手，擅长使用知识库中的信息回答问题。`
+			// 清空最后一条 assistant 消息的内容，准备重新生成
+			const lastIndex = currentHistorys.length - 1
+			if (lastIndex >= 0 && currentHistorys[lastIndex].role === 'assistant') {
+				updateMessageChild({
+					createdAt: '',
+					content: '',
+					contents: [],
+					finish: undefined
 				})
 			}
+		} else {
+			// 正常发送：使用输入框内容
+			if (!inputValue.trim()) return
+			let userMessage = inputValue.trim()
+			const shortcutTitle = inputValue.trim()
+
+			// 如果有上传文件，将文件内容拼接到用户消息
+			if (uploadedFiles.length > 0) {
+				const contexts: string[] = []
+				for (let i = 0; i < uploadedFiles.length; i++) {
+					const fname = uploadedFiles[i].name ? `【文件：${uploadedFiles[i].name}】` : ''
+					contexts.push(`${fname}\n${uploadedFiles[i].content}`)
+				}
+				const fileContext = `\n---\n以下是用户上传的文件内容（供参考）：\n${contexts.join('\n---\n')}\n---\n请结合上述文件内容回答用户问题。`
+				userMessage += fileContext
+			}
+			// 构造要添加的消息列表
+			const msgList: any[] = [
+				{
+					role: 'user',
+					createdAt: new Date().toISOString(),
+					shortcutTitle,
+					content: userMessage,
+					files: uploadedFiles
+				},
+				{
+					role: 'assistant',
+					createdAt: '',
+					content: '',
+					contents: []
+				}
+			]
+			// 新消息
+			if (isNewChat) {
+				const newMessage: ChatMessages = {
+					chatId: currentChatId,
+					createdAt: new Date().toISOString(),
+					title: shortcutTitle,
+					isAutoTitle: false
+				}
+				addMessage(newMessage)
+				if (assistantData) {
+					// 拼接助手提示
+					msgList.unshift({
+						role: 'system',
+						createdAt: new Date().toISOString(),
+						content: assistantData.content
+					})
+				}
+			}
+			// 添加消息到列表
+			msgList.forEach((item: any) => {
+				addMessageChild(item)
+			})
+			// 开始对话后去掉所选择的助手
+			clearAssistantData()
+			// 清空输入框和已上传的文件
+			setInputValue('')
+			setUploadedFiles([])
 		}
-		msgList.forEach((item: any) => {
-			addMessageChild(item)
-		})
-		// 开始对话后去掉所选择的助手
-		clearAssistantData()
-		// 清空已上传的文件
-		setUploadedFiles([])
+		// 设置处理中状态
+		setIsProcessing(true)
 		let lineBuffer = ''
 		let lineThinkBuffer = ''
 		const messageList: any[] = []
-		const chatHistorys: ChatDetail[] = (useChatStore as any).getState().historys?.slice?.(0, -1) || []
 		try {
+			const chatHistorys: ChatDetail[] = (useChatStore as any).getState().historys?.slice?.(0, -1) || []
 			const history = chatHistorys.map?.((e: ChatDetail) => ({ role: e.role, content: e.content })) || []
 			abortControllerRef.current = new AbortController()
 
@@ -362,13 +394,17 @@ export default function useChatContent() {
 				}
 			})
 		} catch (err: any) {
-			setError(err.message)
+			// 用户主动取消：不显示错误信息，设置 finish = 'cancel'
+			const isCancel = err.name === 'AbortError'
+			if (!isCancel) {
+				setError(err.message)
+			}
 			if (messageList?.length === 0) {
 				messageList.push({})
 			}
-			const errorContent = lineBuffer + `\n\n⚠️ =====异常结束=====`
-			messageList[messageList.length - 1].middle = errorContent
-			updateMessageChild({ contents: messageList, content: errorContent })
+			messageList[messageList.length - 1].middle = lineBuffer
+			messageList[messageList.length - 1].finish = isCancel ? 'cancel' : 'error'
+			updateMessageChild({ contents: messageList, content: lineBuffer })
 		} finally {
 			setIsProcessing(false)
 			const lastMessage: any = { createdAt: new Date().toISOString() }
@@ -389,6 +425,13 @@ export default function useChatContent() {
 	 */
 	const clearAssistantData = () => {
 		updateCurrentRoleId('')
+	}
+
+	/**
+	 * 重新发送当前消息
+	 */
+	const reSendText = () => {
+		handleSendMessage(true)
 	}
 
 	return {
@@ -418,6 +461,7 @@ export default function useChatContent() {
 		clearAssistantData,
 		handleOpenFilePicker,
 		handleFileChange,
-		handleRemoveFile
+		handleRemoveFile,
+		reSendText
 	}
 }

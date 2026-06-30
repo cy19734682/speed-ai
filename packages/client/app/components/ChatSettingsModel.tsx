@@ -77,8 +77,8 @@ const ChatSettingsModel: React.FC<any> = () => {
 					<input
 						type="range"
 						min="1024"
-						max="8192"
-						step="16"
+						max="16384"
+						step="32"
 						value={chatSetting?.maxTokens}
 						onChange={(e) => handleChange('maxTokens', parseInt(e.target.value))}
 						className="w-full h-3 bg-gray-200 rounded-full appearance-none cursor-pointer focus:outline-none"
@@ -87,27 +87,6 @@ const ChatSettingsModel: React.FC<any> = () => {
 						<span>简短</span>
 						<span>适中</span>
 						<span>详细</span>
-					</div>
-				</div>
-
-				{/* 上下文深度设置 */}
-				<div>
-					<label className="block text-base font-medium text-gray-800 mb-3">
-						上下文数量: {chatSetting?.contextDeep}
-					</label>
-					<input
-						type="range"
-						min="1"
-						max="10"
-						step="1"
-						value={chatSetting?.contextDeep}
-						onChange={(e) => handleChange('contextDeep', parseInt(e.target.value))}
-						className="w-full h-3 bg-gray-200 rounded-full appearance-none cursor-pointer focus:outline-none"
-					/>
-					<div className="flex justify-between text-sm text-gray-600 mt-3">
-						<span>简单</span>
-						<span>适中</span>
-						<span>精确</span>
 					</div>
 				</div>
 			</div>

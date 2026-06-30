@@ -27,7 +27,7 @@ export const apiFetch = async (url: string | URL | Request, method: any, options
 			config.body = JSON.stringify(body)
 		}
 		if (method === 'GET' || method === 'DELETE') {
-			url += '?' + new URLSearchParams(body).toString() 
+			url += '?' + new URLSearchParams(body).toString()
 		}
 	}
 	try {
@@ -45,6 +45,12 @@ export const apiFetch = async (url: string | URL | Request, method: any, options
 		return response
 	} catch (error: any) {
 		clearTimeout(timeoutId)
+		// 用户主动取消：保留错误名称，便于上层识别并向前端发送取消提示
+		if (error.name === 'AbortError' || error.code === DOMException.ABORT_ERR) {
+			const abortErr = new Error('用户取消请求')
+			abortErr.name = 'AbortError'
+			throw abortErr
+		}
 		console.error(`API请求错误 (${url}):`, error)
 		throw new Error(`网络请求失败: ${error.message}`)
 	}

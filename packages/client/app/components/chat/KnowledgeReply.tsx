@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import { ChatRoundDetail } from '@/app/lib/type'
-import Modal from '@/app/components/commons/Modal'
 import { ArrowDownIcon, LoadingIcon, SuccessIcon } from '@/app/styles/SvgIcon'
 
 interface HTMLPreviewProps {
 	message: ChatRoundDetail
+	setModalData: (data: any) => void
 }
 
 /**
@@ -12,11 +12,10 @@ interface HTMLPreviewProps {
  * @param param0
  * @returns
  */
-const KnowledgeReplyContent: React.FC<HTMLPreviewProps> = ({ message }) => {
+const KnowledgeReplyContent: React.FC<HTMLPreviewProps> = ({ message, setModalData }) => {
 	// 知识库检索结果
 	const { type, results }: any = message.knowledge || {}
 	const [isOpen, setIsOpen] = useState(true)
-	const [knowledgeData, setKnowledgeData] = useState<any>({})
 	return (
 		<>
 			{(type === 'start' || results?.length > 0) && (
@@ -44,9 +43,9 @@ const KnowledgeReplyContent: React.FC<HTMLPreviewProps> = ({ message }) => {
 									className={`flex-shrink-0 ${isOpen ? 'w-[170px]' : 'w-40'} h-14 bg-gray-100 rounded-xl p-2 flex flex-col justify-between`}
 								>
 									<div
-										className="cursor-pointer"
+										className="cursor-pointer hover:border-1 border-indigo-600"
 										onClick={() => {
-											setKnowledgeData(item)
+											setModalData({ ...item, name: item?.metadata?.name })
 										}}
 									>
 										<h3 className="text-sm truncate" title={item?.metadata?.name}>
@@ -61,15 +60,6 @@ const KnowledgeReplyContent: React.FC<HTMLPreviewProps> = ({ message }) => {
 					</div>
 				</div>
 			)}
-
-			<Modal
-				title={knowledgeData?.metadata?.name}
-				isOpen={!!knowledgeData?.content}
-				onClose={() => setKnowledgeData({})}
-				className="w-[1200px]"
-			>
-				<div className="relative w-full text-sm h-[60vh] lg:h-[70vh] whitespace-pre-wrap">{knowledgeData?.content}</div>
-			</Modal>
 		</>
 	)
 }

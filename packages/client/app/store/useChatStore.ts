@@ -21,8 +21,7 @@ const defaultState = {
 	setting: {
 		model: config.ds.defaultModel,
 		temperature: 0.8,
-		maxTokens: 2048,
-		contextDeep: 5
+		maxTokens: 2048
 	},
 	messages: [],
 	historys: [],
