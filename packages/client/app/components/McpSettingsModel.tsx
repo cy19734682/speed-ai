@@ -283,7 +283,7 @@ const McpSettingsModel: React.FC<any> = () => {
 							<button
 								className="text-sm px-3 py-2 btn-primary text-white rounded-md shadow-sm transition-all duration-300 ease-in-out flex items-center justify-center"
 								onClick={() => {
-									setMcpData(initialData)
+									setMcpData({ ...initialData })
 									setIsChildModalOpen(true)
 								}}
 							>

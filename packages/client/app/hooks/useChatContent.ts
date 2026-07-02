@@ -5,6 +5,7 @@ import { handleResponse, UUID } from '@/app/lib/util'
 import { useChatStore, useMcpStore, useChatAssistantStore } from '@/app/store'
 import { ChatMessages, ChatDetail, Assistant, Knowledge } from '@/app/lib/type'
 import { useMcpToolSelect } from '@/app/components/chat/McpToolSelect'
+import { getLocalKB } from '@/app/lib/langchain/local'
 
 export default function useChatContent() {
 	const {
@@ -169,7 +170,6 @@ export default function useChatContent() {
 				content: `USER: ${userContent} \n\nAssistant: ${assistantContent?.slice(0, 400)} \n\n`
 			}
 			const response: any = await apiFetch('/api/chat', 'POST', {
-				method: 'POST',
 				body: {
 					messages: [message],
 					options: {
@@ -354,9 +354,25 @@ export default function useChatContent() {
 			const history = chatHistorys.map?.((e: ChatDetail) => ({ role: e.role, content: e.content })) || []
 			abortControllerRef.current = new AbortController()
 
-			// 发送消息到 API，携带知识库开关、searchTool 等
+			// 如果开启了知识库开关：先在前端搜索本地知识库（IndexedDB）
+			// 然后将本地搜索结果通过 options.localKnowledgeResults 传递给服务端
+			// 服务端会将云端知识库 + 本地知识库合并后注入对话
+			let localKnowledgeResults: any[] = []
+			if (knowledge) {
+				try {
+					const lastUserMessage = [...history].reverse().find((m: any) => m.role === 'user')
+					const queryText = (lastUserMessage?.content || '') as string
+					if (queryText.trim()) {
+						const localKB = getLocalKB()
+						localKnowledgeResults = await localKB.similaritySearch(queryText, 5)
+					}
+				} catch (e) {
+					console.warn('[useChatContent] 本地知识库搜索失败：', e)
+				}
+			}
+
+			// 发送消息到 API，携带知识库开关、searchTool、本地知识库结果等
 			const response: any = await apiFetch('/api/chat', 'POST', {
-				method: 'POST',
 				controller: abortControllerRef.current,
 				body: {
 					messages: [...history],
@@ -368,7 +384,9 @@ export default function useChatContent() {
 						tools: mcpList.filter((item: any) => item.enabled),
 						model: setting.model,
 						temperature: setting.temperature,
-						maxTokens: setting.maxTokens
+						maxTokens: setting.maxTokens,
+						// 本地知识库搜索结果（服务端会与云端合并）
+						localKnowledgeResults
 					}
 				}
 			})

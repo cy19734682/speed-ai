@@ -13,7 +13,6 @@ export const CHAT_STORE_KEY = 'chat-storage'
  */
 export const CHAT_ASSISTANT_STORE_KEY = 'chat-assistant-storage'
 
-
 /**
  * 联网搜索工具的存储键名
  */
@@ -35,6 +34,10 @@ export const CHAT_LIST_STORE_KEY = 'chatList'
  * 对话详情存储键名
  */
 export const CHAT_DETAIL_STORE_KEY = 'chatHistory'
+/**
+ * 本地知识库存储键名
+ */
+export const LOCAL_KNOWLEDGE_STORE_KEY = 'localKnowledge'
 
 /**
  * 模型列表

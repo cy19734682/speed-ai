@@ -35,26 +35,24 @@ const KnowledgeReplyContent: React.FC<HTMLPreviewProps> = ({ message, setModalDa
 							{type === 'end' && <ArrowDownIcon cls={`ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />}
 						</div>
 					</div>
-					<div className={`py-2 flex scroll-smooth gap-2 transition-all duration-300 ${isOpen ? 'block' : 'hidden'}`}>
+					<div
+						className={`py-2 flex flex-wrap scroll-smooth gap-2 transition-all duration-300 ${isOpen ? 'block' : 'hidden'}`}
+					>
 						{results?.length > 0 &&
 							results?.map((item: any, index: number) => (
 								<div
 									key={'knowledge' + index}
-									className={`flex-shrink-0 ${isOpen ? 'w-[170px]' : 'w-40'} h-14 bg-gray-100 rounded-xl p-2 flex flex-col justify-between`}
+									onClick={() => {
+										setModalData({ ...item, name: item?.metadata?.name })
+									}}
+									className={`flex-shrink-0 ${isOpen ? 'w-[170px]' : 'w-40'} cursor-pointer border border-transparent hover:border-blue-500 h-14 bg-gray-100 rounded-xl p-2 flex flex-col justify-between`}
 								>
-									<div
-										className="cursor-pointer hover:border-1 border-indigo-600"
-										onClick={() => {
-											setModalData({ ...item, name: item?.metadata?.name })
-										}}
-									>
-										<h3 className="text-sm truncate" title={item?.metadata?.name}>
-											{index + 1}. {item?.metadata?.name}
-										</h3>
-										<p className="text-gray-400 text-xs mt-1 truncate" title={item?.metadata?.description}>
-											{item?.metadata?.description}
-										</p>
-									</div>
+									<h3 className="text-sm truncate" title={item?.metadata?.name}>
+										{index + 1}. {item?.metadata?.name}
+									</h3>
+									<p className="text-gray-400 text-xs mt-1 truncate" title={item?.metadata?.description}>
+										{item?.metadata?.description}
+									</p>
 								</div>
 							))}
 					</div>

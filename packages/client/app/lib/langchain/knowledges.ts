@@ -261,9 +261,12 @@ export class KnowledgeBaseTool {
 	/**
 	 * 搜索相似文档
 	 * @param query 查询文本
-	 * @param topK 返回结果数量
+	 * @param topK 返回结果的最大数量
+	 * @param minScore 最低相似度阈值（范围 0~1，越大越严格），默认 0.5
+	 *                 传 0 则仅按 topK 限制数量，不做阈值过滤
+	 * score 统一语义：越大越相似，范围 [0, 1]
 	 */
-	async similaritySearch(query: string, topK: number = 5): Promise<SearchResult[]> {
+	async similaritySearch(query: string, topK: number = 5, minScore: number = 0.5): Promise<SearchResult[]> {
 		this.ensureInitialized()
 
 		const queryVector = await this.embeddings.embedQuery(query)
@@ -271,9 +274,11 @@ export class KnowledgeBaseTool {
 		const columnName = this.columnName
 		const indexName = `idx_${tableName}_${columnName}`
 
+		// vector_distance_cos 返回的是距离（越小越相似，范围约 [0, 2]）
+		// 这里先取出距离，然后在代码层转换为相似度（越大越相似，范围 [0, 1]）
 		const sql = `
 			SELECT top_k.rowid as id, "${tableName}".content, "${tableName}".metadata,
-				   vector_distance_cos("${tableName}"."${columnName}", vector(:queryVector)) AS score
+				   vector_distance_cos("${tableName}"."${columnName}", vector(:queryVector)) AS distance
 			FROM vector_top_k('${indexName}', vector(:queryVector), CAST(:k AS INTEGER)) AS top_k
 			JOIN "${tableName}" ON top_k.rowid = "${tableName}".id
 		`
@@ -283,18 +288,30 @@ export class KnowledgeBaseTool {
 			args: { queryVector: this.toVectorLiteral(queryVector), k: topK }
 		})
 
-		return result.rows.map((row) => ({
-			content: row.content as string,
-			metadata: row.metadata ? JSON.parse(row.metadata as string) : {},
-			score: row.score as number
-		}))
+		// 将距离（范围约 [0, 2]）归一化为相似度 score（范围 [0, 1]，越大越相似）
+		// 与本地知识库保持一致的语义：score = 1 - distance / 2
+		// 按 minScore 过滤：只返回满足阈值的结果
+		return result.rows
+			.map((row) => {
+				const distance = Number(row.distance || 1) // 防止 null
+				const score = 1 - distance / 2 // 归一化到 [0, 1]
+				return {
+					content: row.content as string,
+					metadata: row.metadata ? JSON.parse(row.metadata as string) : {},
+					score: Math.max(0, Math.min(1, score)) // 钳制到 [0, 1]
+				}
+			})
+			.filter((r) => r.score > minScore)
 	}
 
 	/**
 	 * 搜索上下文（带分数）
+	 * @param query 查询文本
+	 * @param topK 最多返回的结果数量
+	 * @param minScore 最低相似度阈值，默认 0.5
 	 */
-	async searchContext(query: string, topK: number = 5): Promise<SearchResult[]> {
-		return this.similaritySearch(query, topK)
+	async searchContext(query: string, topK: number = 5, minScore: number = 0.5): Promise<SearchResult[]> {
+		return this.similaritySearch(query, topK, minScore)
 	}
 
 	/**

@@ -4,8 +4,8 @@ import { Assistant } from '@/app/lib/type'
 import { UUID } from '@/app/lib/util'
 import Modal from '@/app/components/commons/Modal'
 import { AddMarkIcon } from '@/app/styles/SvgIcon'
-import {useToast} from "@/app/components/commons/Toast"
-import {useConfirm} from "@/app/components/commons/Confirm"
+import { useToast } from '@/app/components/commons/Toast'
+import { useConfirm } from '@/app/components/commons/Confirm'
 
 const initialData = {
 	id: '',
@@ -18,8 +18,8 @@ const initialData = {
  * @constructor
  */
 const ChatAssistantModel: React.FC<any> = () => {
-  const toast = useToast()
-  const { confirm } = useConfirm()
+	const toast = useToast()
+	const { confirm } = useConfirm()
 	const { isModalAssistantOpen, setIsModalAssistantOpen } = useGeneralStore()
 	const { assistants, addAssistant, removeAssistant, updateAssistant } = useChatAssistantStore()
 	const { updateCurrentRoleId } = useChatStore()
@@ -39,11 +39,11 @@ const ChatAssistantModel: React.FC<any> = () => {
 	 */
 	const AccAddOpenModel = ({ isOpen, item, onClose }: { isOpen: boolean; item: Assistant; onClose: () => void }) => {
 		const [accData, setAccData] = useState<Assistant>(item)
-    
-    useEffect(() => {
-      setAccData(item)
-    }, [item])
-    
+
+		useEffect(() => {
+			setAccData(item)
+		}, [item])
+
 		// 表单输入赋值
 		const handleChange = (name: string, value: any) => {
 			setAccData((prev) => ({ ...prev, [name]: value }))
@@ -60,32 +60,32 @@ const ChatAssistantModel: React.FC<any> = () => {
 
 			if (accData.id) {
 				updateAssistant(accData.id, { ...accData })
-        toast.success("修改成功")
+				toast.success('修改成功')
 			} else {
 				if (assistantList?.some((e: Assistant) => e?.name === accData?.name)) {
 					return toast.warning('助手编码已存在！')
 				}
 				addAssistant({ ...accData, id: UUID() })
-        toast.success("添加成功")
+				toast.success('添加成功')
 			}
 			onClose()
 		}
 
 		// 删除操作
 		const handleRemove = () => {
-      confirm({
-        title: '删除确认',
-        content: '您确定要删除此角色吗？此操作不可撤销。',
-        submitConfirm: () => {
-          removeAssistant(accData.id)
-          onClose()
-          toast.success("删除成功")
-        }
-      })
+			confirm({
+				title: '删除确认',
+				content: '您确定要删除此角色吗？此操作不可撤销。',
+				submitConfirm: () => {
+					removeAssistant(accData.id)
+					onClose()
+					toast.success('删除成功')
+				}
+			})
 		}
 
 		const customFooter = (
-			<div className={`relative w-full mt-8 flex ${accData?.id ? 'justify-between' : 'justify-end'}`}>
+			<div className={`relative w-full mt-2 flex ${accData?.id ? 'justify-between' : 'justify-end'}`}>
 				{accData?.id && (
 					<button className="block px-2 rounded-lg text-sm btn-error" onClick={handleRemove}>
 						删除
@@ -145,18 +145,13 @@ const ChatAssistantModel: React.FC<any> = () => {
 	})
 	return (
 		<>
-			<Modal
-				isOpen={isModalAssistantOpen}
-				onClose={closeModal}
-				title="AI助手管理"
-				className="w-[850px]"
-			>
+			<Modal isOpen={isModalAssistantOpen} onClose={closeModal} title="AI助手管理" className="w-[850px]">
 				<div className="min-h-[400px] flex-1 overflow-auto px-2">
 					<div className="p-3 flex justify-start items-center">
 						<button
 							className="text-sm px-3 py-2 btn-primary text-white rounded-md shadow-sm transition-all duration-300 ease-in-out flex items-center justify-center"
 							onClick={() => {
-								setAssistantData(initialData)
+								setAssistantData({ ...initialData })
 								setIsChildModalOpen(true)
 							}}
 						>

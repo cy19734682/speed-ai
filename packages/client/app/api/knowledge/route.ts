@@ -1,10 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getKB } from '@/app/lib/langchain'
+import { getKB } from '@/app/lib/langchain/cloud'
+import { hasCloudKBAuth } from '@/app/api/auth/route'
+
+/**
+ * 云端知识库 API - 权限校验
+ * 严格的服务端保护：检查请求是否携带有效的 token（httpOnly cookie）
+ * 即使绕过前端，也无法直接访问云端知识库数据
+ */
+
+/**
+ * 统一权限校验中间件（检查 cookie 中的 token）
+ */
+const checkAuth = (req: NextRequest): { ok: boolean; error?: string } => {
+	// 检查请求是否携带有效的 token（httpOnly cookie）
+	if (!hasCloudKBAuth(req)) {
+		return { ok: false, error: '未授权，请先登录' }
+	}
+
+	return { ok: true }
+}
 
 /**
  * 知识库管理与搜索查询 API
  */
 export async function GET(req: NextRequest) {
+	const auth = checkAuth(req)
+	if (!auth.ok) {
+		return NextResponse.json({ success: false, error: auth.error }, { status: 403 })
+	}
 	try {
 		const { searchParams } = new URL(req.url)
 		const page = Number(searchParams.get('page') || '1')
@@ -25,10 +48,15 @@ export async function GET(req: NextRequest) {
 		)
 	}
 }
+
 /**
  * 知识库管理与搜索新增 API
  */
 export async function POST(req: NextRequest) {
+	const auth = checkAuth(req)
+	if (!auth.ok) {
+		return NextResponse.json({ success: false, error: auth.error }, { status: 403 })
+	}
 	try {
 		const body = await req.json().catch(() => ({}))
 		const { name, content, ...metadata } = body
@@ -56,6 +84,10 @@ export async function POST(req: NextRequest) {
  * 知识库管理与搜索删除 API
  */
 export async function DELETE(req: NextRequest) {
+	const auth = checkAuth(req)
+	if (!auth.ok) {
+		return NextResponse.json({ success: false, error: auth.error }, { status: 403 })
+	}
 	try {
 		const { searchParams } = new URL(req.url)
 		const clear = searchParams.get('clear') === 'true'
@@ -85,6 +117,10 @@ export async function DELETE(req: NextRequest) {
  * 知识库管理与搜索编辑 API
  */
 export async function PUT(req: NextRequest) {
+	const auth = checkAuth(req)
+	if (!auth.ok) {
+		return NextResponse.json({ success: false, error: auth.error }, { status: 403 })
+	}
 	try {
 		const body = await req.json().catch(() => ({}))
 		const { id, name, content, ...metadata } = body

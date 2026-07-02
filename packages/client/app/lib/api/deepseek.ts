@@ -3,7 +3,7 @@ import { formatMcpSchemaTool, handleDeepseekResponse, replyFormat } from '@/app/
 import { config } from '@/app/lib/config'
 import { initMcpClient } from '@/app/lib/mcp-service'
 import { nameConversation, structureToolAction } from '@/app/lib/prompts'
-import { getKB } from '@/app/lib/langchain'
+import { getKB } from '@/app/lib/langchain/cloud'
 
 /**
  * 处理自动生成标题
@@ -20,24 +20,48 @@ const autoGenerateTitle = async (messages: any, options: Record<string, any> = {
 }
 
 /**
- * 基于本地知识库检索相关上下文
- * 仅当 options.knowledge === true 时调用；知识库通过向量检索返回内容片段
+ * 基于知识库检索相关上下文
+ * - 云端知识库：运行在服务端（libsql），所有人都可使用
+ * - 本地知识库：由前端搜索后通过 options.localKnowledgeResults 传入
+ * 两者结果会合并排序后注入到对话
+ *
+ * 注意：只有「维护」云端知识库（增删改）需要密码权限，
+ *       「使用」云端知识库（对话检索）所有人都可以使用
  */
-const retrieveKnowledgeContext = async (messages: any, topK = 4): Promise<Record<string, any>> => {
+const retrieveKnowledgeContext = async (
+	messages: any,
+	options: Record<string, any> = {},
+	topK = 4
+): Promise<Record<string, any>> => {
 	try {
 		const query = [...messages].reverse().find((m: any) => m.role === 'user')?.content
-		if (!query || typeof query !== 'string') return []
-		const kb = await getKB()
-		const results: any[] = await kb.searchContext(query, topK)
-		if (results?.length === 0) {
-			return {
-				context: '',
-				results: []
-			}
+		if (!query || typeof query !== 'string') return { context: '', results: [] }
+
+		// 1) 云端知识库搜索（仅在 service-side，libsql）
+		let cloudResults: any[] = []
+		try {
+			const kb = await getKB()
+			cloudResults = await kb.searchContext(query, topK)
+		} catch (e) {
+			console.warn('[知识库检索] 云端搜索失败：', e)
 		}
-		const contextStrings = results.map((item, index) => {
+
+		// 2) 本地知识库结果（前端 IndexedDB 已搜索好）
+		const localResults: any[] = Array.isArray(options.localKnowledgeResults) ? options.localKnowledgeResults : []
+
+		// 3) 合并并按分数降序排序（展示 topK * 2，方便用户查看更多相关内容）
+		const merged = [...cloudResults, ...localResults].sort(
+			(a: any, b: any) => (Number(b.score) || 0) - (Number(a.score) || 0)
+		)
+		const results = merged.slice(0, Math.max(topK * 2, merged.length))
+
+		if (results.length === 0) {
+			return { context: '', results: [] }
+		}
+
+		const contextStrings = results.map((item: any, index: number) => {
 			const name = item.metadata?.name || item.metadata?.source || '未知来源'
-			return `[${index + 1}] 来源: ${name} (相关度: ${Number(item.score.toFixed(4))})\n${item.content}`
+			return `[${index + 1}] 来源: ${name} (相关度: ${Number(item.score || 0).toFixed(4)})\n${item.content}`
 		})
 		const context = `以下是知识库中与您问题相关的资料（请结合这些信息回答，若知识库中没有相关内容则按一般常识回答）：\n${contextStrings.join('\n\n')}`
 		return {
@@ -101,7 +125,7 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 				thinking: { type: thinking ? 'enabled' : 'disabled' }
 			},
 			headers: {
-				Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`
+				Authorization: `Bearer ${config.ds.apiKey}`
 			},
 			controller: abortCtrl,
 			timeout: 30000 // 30秒超时
@@ -114,8 +138,7 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 	// 知识库检索
 	if (knowledge) {
 		controller.enqueue(replyFormat('knowledge', { index: round, content: { type: 'start' } }))
-
-		const { context, results = [] } = await retrieveKnowledgeContext(messages, 5)
+		const { context, results = [] } = await retrieveKnowledgeContext(messages, options, 5)
 		if (context && results?.length > 0) {
 			messages.unshift({
 				role: 'system',
