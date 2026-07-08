@@ -1,7 +1,7 @@
 {
   "name": "mcp-server",
   "version": "1.0.0",
-  "description": "SSE Server for MCP Demo",
+  "description": "Streamable HTTP Server for MCP",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",
@@ -10,13 +10,13 @@
     "lint": "eslint src/**/*.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.8.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "cheerio": "^1.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "node-cron": "^4.2.1",
-    "zod": "^3.22.3"
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.13",

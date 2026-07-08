@@ -18,7 +18,7 @@
     "@langchain/openai": "^1.4.7",
     "@langchain/textsplitters": "^1.0.1",
     "@libsql/client": "^0.17.4",
-    "@modelcontextprotocol/sdk": "^1.8.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.6.7",
     "dotenv": "^16.4.7",
     "idb": "^8.0.3",
