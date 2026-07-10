@@ -20,7 +20,11 @@ import { apiFetch } from '@/app/lib/api/fetch'
 export const loginCloudKB = async (password: string): Promise<boolean> => {
 	if (!password) return false
 	try {
-		const resp = await apiFetch('/api/auth', 'POST', { body: { password } })
+		const resp = await apiFetch('/api/auth', 'POST', {
+			body: { password },
+			showGlobalLoading: true,
+			loadingText: '正在登录...'
+		})
 		const data = await resp.json()
 		return !!data?.success
 	} catch (e) {

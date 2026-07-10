@@ -119,6 +119,11 @@ export interface McpTool {
 	accessToken: string
 	tool: string
 	enabled: boolean
+	// 连接类型：streamable-http（HTTP远程连接）| stdio（本地进程连接）
+	connectionType?: 'streamable-http' | 'stdio'
+	// stdio 模式专用字段
+	command?: string // 完整命令字符串，如：npx -y @modelcontextprotocol/server-github
+	env?: string // 环境变量，JSON字符串格式，如：{"GITHUB_PERSONAL_ACCESS_TOKEN": "xxx"}
 	[x: string]: any
 }
 

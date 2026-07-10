@@ -18,7 +18,10 @@ const initialData = {
 	description: '',
 	accessToken: '',
 	tool: '',
-	enabled: false
+	enabled: false,
+	connectionType: 'streamable-http' as 'streamable-http' | 'stdio',
+	command: '',
+	env: ''
 }
 
 /**
@@ -30,7 +33,6 @@ const McpSettingsModel: React.FC<any> = () => {
 	const { confirm } = useConfirm()
 	const { isModalMcpOpen, setIsModalMcpOpen } = useGeneralStore()
 	const { tools, searchTool, addTool, removeTool, updateTool, updateSearchTool } = useMcpStore()
-
 	const [isChildModalOpen, setIsChildModalOpen] = useState(false)
 	const [mcpList, setMcpList] = useState<McpTool[]>([])
 	const [mcpData, setMcpData] = useState<McpTool>(initialData)
@@ -61,16 +63,63 @@ const McpSettingsModel: React.FC<any> = () => {
 	const McpAddOpenModel = ({ isOpen, item, onClose }: { isOpen: boolean; item: McpTool; onClose: () => void }) => {
 		const [mcpTool, setMcpTool] = useState<McpTool>(item)
 		const [childTools, setChildTools] = useState<any[]>([])
-		const [testLoading, setTestLoading] = useState<boolean>(false)
 		const isDelete = mcpTool?.id && mcpTool?.id !== WEB_SEARCH_KEY
 		const toolListRef = useRef<HTMLDivElement>(null)
+
+		// 解析环境变量为键值对数组
+		const parseEnvVars = (envStr: string): Array<{ key: string; value: string }> => {
+			if (!envStr) return []
+			try {
+				const parsed = typeof envStr === 'string' ? JSON.parse(envStr) : envStr
+				if (typeof parsed === 'object' && parsed !== null) {
+					return Object.entries(parsed).map(([key, value]) => ({ key, value: String(value) }))
+				}
+			} catch (e) {
+				console.warn('环境变量解析失败', e)
+			}
+			return []
+		}
+
+		// 将键值对数组转换为JSON字符串
+		const envVarsToJson = (envVars: Array<{ key: string; value: string }>): string => {
+			const obj: Record<string, string> = {}
+			envVars.forEach(({ key, value }) => {
+				if (key.trim()) {
+					obj[key.trim()] = value
+				}
+			})
+			return Object.keys(obj).length > 0 ? JSON.stringify(obj, null, 2) : ''
+		}
+
+		// 环境变量状态
+		const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>(() => parseEnvVars(item?.env || ''))
 
 		useEffect(() => {
 			if (item && isOpen) {
 				setMcpTool(item)
 				setChildTools([])
+				setEnvVars(parseEnvVars(item?.env || ''))
 			}
 		}, [item, isOpen])
+
+		// 添加环境变量
+		const addEnvVar = () => {
+			setEnvVars([...envVars, { key: '', value: '' }])
+		}
+
+		// 删除环境变量
+		const removeEnvVar = (index: number) => {
+			const newEnvVars = envVars.filter((_, i) => i !== index)
+			setEnvVars(newEnvVars)
+			handleChange('env', envVarsToJson(newEnvVars))
+		}
+
+		// 更新环境变量
+		const updateEnvVar = (index: number, field: 'key' | 'value', val: string) => {
+			const newEnvVars = envVars.map((env, i) => (i === index ? { ...env, [field]: val } : env))
+			setEnvVars(newEnvVars)
+			handleChange('env', envVarsToJson(newEnvVars))
+		}
 
 		// 表单输入赋值
 		const handleChange = (name: string, value: any) => {
@@ -85,15 +134,25 @@ const McpSettingsModel: React.FC<any> = () => {
 			if (!mcpTool?.name?.trim()) {
 				return toast.warning('名称不能为空')
 			}
-			if (!mcpTool?.url?.trim()) {
-				return toast.warning('URL不能为空')
-			}
 			if (!mcpTool?.tag?.trim()) {
 				return toast.warning('标签不能为空')
 			}
-			if (!mcpTool?.url?.trim()?.startsWith('http')) {
-				return toast.warning('URL格式不正确')
+
+			// 根据连接类型验证
+			const connectionType = mcpTool?.connectionType || 'streamable-http'
+			if (connectionType === 'streamable-http') {
+				if (!mcpTool?.url?.trim()) {
+					return toast.warning('URL不能为空')
+				}
+				if (!mcpTool?.url?.trim()?.startsWith('http')) {
+					return toast.warning('URL格式不正确')
+				}
+			} else if (connectionType === 'stdio') {
+				if (!mcpTool?.command?.trim()) {
+					return toast.warning('启动命令不能为空')
+				}
 			}
+
 			if (!(childTools.length > 0)) {
 				return toast.warning('请先测试MCP连接是否可用！')
 			}
@@ -129,15 +188,28 @@ const McpSettingsModel: React.FC<any> = () => {
 
 		// 测试操作
 		const handleTest = async () => {
-			setTestLoading(true)
 			try {
-				if (!mcpTool?.url?.trim()) {
-					return toast.warning('URL不能为空')
+				const connectionType = mcpTool?.connectionType || 'streamable-http'
+
+				// 根据连接类型验证
+				if (connectionType === 'streamable-http') {
+					if (!mcpTool?.url?.trim()) {
+						return toast.warning('URL不能为空')
+					}
+					if (!mcpTool?.url?.trim()?.startsWith('http')) {
+						return toast.warning('URL格式不正确')
+					}
+				} else if (connectionType === 'stdio') {
+					if (!mcpTool?.command?.trim()) {
+						return toast.warning('启动命令不能为空')
+					}
 				}
-				if (!mcpTool?.url?.trim()?.startsWith('http')) {
-					return toast.warning('URL格式不正确')
-				}
-				const ret = await apiFetch('/api/tools', 'POST', { body: mcpTool })
+
+				const ret = await apiFetch('/api/tools', 'POST', {
+					body: mcpTool,
+					showGlobalLoading: true,
+					loadingText: '正在测试连接...'
+				})
 				const { data } = await ret.json()
 				setChildTools(data?.tools || [])
 				setTimeout(() => {
@@ -145,8 +217,6 @@ const McpSettingsModel: React.FC<any> = () => {
 				}, 100)
 			} catch (e: any) {
 				toast.error('连接错误：' + (e?.message || e))
-			} finally {
-				setTestLoading(false)
 			}
 		}
 
@@ -158,10 +228,7 @@ const McpSettingsModel: React.FC<any> = () => {
 					</button>
 				)}
 				<div className="flex justify-between">
-					<button
-						className={`block px-4 py-2 rounded-lg mr-2 ${testLoading ? 'btn-disabled' : 'btn-info'}`}
-						onClick={handleTest}
-					>
+					<button className={`block px-4 py-2 rounded-lg mr-2 btn-info`} onClick={handleTest}>
 						测试
 					</button>
 					<button className="block px-4 py-2 rounded-lg btn-primary" onClick={handleSubmit}>
@@ -171,6 +238,9 @@ const McpSettingsModel: React.FC<any> = () => {
 			</div>
 		)
 
+		// 获取当前连接类型
+		const connectionType = mcpTool?.connectionType || 'streamable-http'
+
 		return (
 			<Modal
 				isOpen={isOpen}
@@ -179,7 +249,7 @@ const McpSettingsModel: React.FC<any> = () => {
 				footer={customFooter}
 				className="w-[750px]"
 			>
-				<div className="flex-1 px-2 flex flex-col items-center justify-between">
+				<div className="relative flex-1 px-2 flex flex-col items-center justify-between">
 					<div className="relative w-full pt-4 lg:pt-6 space-y-4">
 						<label className="block">
 							<span className="block font-semibold mb-2">
@@ -217,18 +287,122 @@ const McpSettingsModel: React.FC<any> = () => {
 								onChange={(e) => handleChange('tag', e.target.value)}
 							/>
 						</label>
+
+						{/* 连接类型选择 */}
 						<label className="block">
 							<span className="block font-semibold mb-2">
-								<span className="text-red-500">*</span>URL
+								<span className="text-red-500">*</span>连接类型
 							</span>
-							<input
-								type="text"
-								className="bg-white w-full border border-gray-300 rounded-md py-2 px-3"
-								placeholder="https://..."
-								value={mcpTool?.url}
-								onChange={(e) => handleChange('url', e.target.value)}
-							/>
+							<div className="flex gap-4">
+								<label className="flex items-center cursor-pointer">
+									<input
+										type="radio"
+										name="connectionType"
+										value="streamable-http"
+										checked={connectionType === 'streamable-http'}
+										onChange={() => handleChange('connectionType', 'streamable-http')}
+										className="mr-2"
+									/>
+									<span className="text-sm">HTTP 远程连接</span>
+								</label>
+								<label className="flex items-center cursor-pointer">
+									<input
+										type="radio"
+										name="connectionType"
+										value="stdio"
+										checked={connectionType === 'stdio'}
+										onChange={() => handleChange('connectionType', 'stdio')}
+										className="mr-2"
+									/>
+									<span className="text-sm">stdio 本地进程</span>
+								</label>
+							</div>
 						</label>
+
+						{/* streamable-http 模式表单 */}
+						{connectionType === 'streamable-http' && (
+							<>
+								<label className="block">
+									<span className="block font-semibold mb-2">
+										<span className="text-red-500">*</span>URL
+									</span>
+									<input
+										type="text"
+										className="bg-white w-full border border-gray-300 rounded-md py-2 px-3"
+										placeholder="https://..."
+										value={mcpTool?.url}
+										onChange={(e) => handleChange('url', e.target.value)}
+									/>
+								</label>
+								<label className="block">
+									<span className="block font-semibold mb-2">访问令牌</span>
+									<textarea
+										className="bg-white w-full border border-gray-300 rounded-md py-2 px-3"
+										placeholder="请输入访问令牌"
+										value={mcpTool?.accessToken}
+										onChange={(e) => handleChange('accessToken', e.target.value)}
+									/>
+								</label>
+							</>
+						)}
+
+						{/* stdio 模式表单 */}
+						{connectionType === 'stdio' && (
+							<>
+								<label className="block">
+									<span className="block font-semibold mb-2">
+										<span className="text-red-500">*</span>启动命令
+									</span>
+									<input
+										type="text"
+										className="bg-white w-full border border-gray-300 rounded-md py-2 px-3"
+										placeholder="如：npx -y @modelcontextprotocol/server-github"
+										value={mcpTool?.command}
+										onChange={(e) => handleChange('command', e.target.value)}
+									/>
+								</label>
+								<label className="block">
+									<span className="block font-semibold mb-2">环境变量</span>
+									<div className="space-y-2">
+										{envVars.map((env, index) => (
+											<div key={index} className="flex gap-2 items-center">
+												<input
+													type="text"
+													className="bg-white flex-1 border border-gray-300 rounded-md py-2 px-3 text-sm"
+													placeholder="变量名"
+													value={env.key}
+													onChange={(e) => updateEnvVar(index, 'key', e.target.value)}
+												/>
+												<input
+													type="text"
+													className="bg-white flex-1 border border-gray-300 rounded-md py-2 px-3 text-sm"
+													placeholder="变量值"
+													value={env.value}
+													onChange={(e) => updateEnvVar(index, 'value', e.target.value)}
+												/>
+												<button
+													type="button"
+													className="text-red-500 hover:text-red-700 px-2 py-1 text-xl"
+													onClick={() => removeEnvVar(index)}
+													title="删除"
+												>
+													✕
+												</button>
+											</div>
+										))}
+										<button
+											type="button"
+											className="text-blue-500 hover:text-blue-700 text-base flex items-center gap-1"
+											onClick={addEnvVar}
+										>
+											<span>+</span>
+											<span>添加环境变量</span>
+										</button>
+									</div>
+								</label>
+							</>
+						)}
+
 						<label className="block">
 							<span className="block font-semibold mb-2">描述</span>
 							<textarea
@@ -236,15 +410,6 @@ const McpSettingsModel: React.FC<any> = () => {
 								placeholder="请输入工具描述"
 								value={mcpTool?.description}
 								onChange={(e) => handleChange('description', e.target.value)}
-							/>
-						</label>
-						<label className="block">
-							<span className="block font-semibold mb-2">访问令牌</span>
-							<textarea
-								className="bg-white w-full border border-gray-300 rounded-md py-2 px-3"
-								placeholder="请输入访问令牌"
-								value={mcpTool?.accessToken}
-								onChange={(e) => handleChange('accessToken', e.target.value)}
 							/>
 						</label>
 					</div>

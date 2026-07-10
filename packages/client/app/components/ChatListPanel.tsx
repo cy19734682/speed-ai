@@ -245,17 +245,17 @@ const ChatListPanel: React.FC = () => {
 				</div>
 				<div
 					className="text-sm px-3 py-2 text-gray-900 rounded-md hover:bg-gray-100 flex items-center cursor-pointer"
-					onClick={() => setIsModalSettingOpen(true)}
-				>
-					<ChatSettingIcon cls="h-5 w-5 mr-2" />
-					<span>设置</span>
-				</div>
-				<div
-					className="text-sm px-3 py-2 text-gray-900 rounded-md hover:bg-gray-100 flex items-center cursor-pointer"
 					onClick={() => setIsModalMcpOpen(true)}
 				>
 					<McpIcon cls="h-5 w-5 mr-2" />
 					<span>MCP</span>
+				</div>
+				<div
+					className="text-sm px-3 py-2 text-gray-900 rounded-md hover:bg-gray-100 flex items-center cursor-pointer"
+					onClick={() => setIsModalSettingOpen(true)}
+				>
+					<ChatSettingIcon cls="h-5 w-5 mr-2" />
+					<span>设置</span>
 				</div>
 			</div>
 		</div>

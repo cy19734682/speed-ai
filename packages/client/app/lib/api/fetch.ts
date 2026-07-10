@@ -3,10 +3,32 @@
  * @param {string} url - API端点URL
  * @param {string} method - HTTP方法
  * @param {Object} [options] - 选项
+ * @param {boolean} [options.showGlobalLoading] - 是否显示全局加载遮罩，默认false
+ * @param {string} [options.loadingText] - 加载提示文字，默认'处理中...'
  * @returns {Promise<Response>} 返回响应对象
  */
 export const apiFetch = async (url: string | URL | Request, method: any, options: any = {}): Promise<Response> => {
-	let { body, headers = {}, controller, timeout = 30000 } = options
+	let {
+		body,
+		headers = {},
+		controller,
+		timeout = 30000,
+		showGlobalLoading = false,
+		loadingText = '处理中...'
+	} = options
+
+	// 显示全局加载遮罩
+	let hideLoading: (() => void) | null = null
+
+	if (showGlobalLoading && typeof window !== 'undefined') {
+		try {
+			const { useLoadingStore } = await import('@/app/store')
+			useLoadingStore.getState().showLoading(loadingText)
+			hideLoading = () => useLoadingStore.getState().hideLoading()
+		} catch (e) {
+			console.warn('加载全局loading组件失败', e)
+		}
+	}
 
 	const defaultHeaders = {
 		'Content-Type': 'application/json'
@@ -53,6 +75,10 @@ export const apiFetch = async (url: string | URL | Request, method: any, options
 		}
 		console.error(`API请求错误 (${url}):`, error)
 		throw new Error(`网络请求失败: ${error.message}`)
+	} finally {
+		if (hideLoading) {
+			hideLoading()
+		}
 	}
 }
 

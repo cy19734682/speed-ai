@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import '@/app/styles/globals.css'
+import GlobalLoading from '@/app/components/commons/GlobalLoading'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,6 +20,7 @@ export default function RootLayout({
       <body className={`m-0 p-0 h-full ${inter.className}`}>
         <div className="h-full bg-gray-50">
           {children}
+          <GlobalLoading />
         </div>
       </body>
     </html>

@@ -1,5 +1,6 @@
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio'
 import type { Tool, McpTool } from './type'
 
 // ───── 缓存配置 ────────────────────────────────────────────────────────
@@ -14,8 +15,8 @@ const cache: Record<string, CacheItem<any>> = {}
 let isConnecting = false
 let lastConnectionAttempt = 0
 
-// ───── 辅助函数：构造传输选项 ───────────────────────────────────────────
-function buildTransportOptions(transportConfig: Record<string, any>): any {
+// ───── 辅助函数：构造 HTTP 传输选项 ───────────────────────────────────────────
+function buildHttpTransportOptions(transportConfig: Record<string, any>): any {
 	const token = (transportConfig.accessToken || '').toString().trim()
 	const useOAuth = transportConfig.useOAuth === true
 
@@ -41,13 +42,79 @@ function buildTransportOptions(transportConfig: Record<string, any>): any {
 	return opts
 }
 
-// ───── 主入口：初始化 MCP 客户端 ──────────────────────────────────
+// ───── 辅助函数：构造 stdio 传输选项 ───────────────────────────────────────────
+function buildStdioTransportOptions(transportConfig: Record<string, any>): any {
+	const { command, env } = transportConfig
+
+	if (!command) {
+		throw new Error('[MCP] stdio 模式必须提供 command 字段')
+	}
+
+	// 解析完整命令字符串，分离命令和参数
+	const trimmedCommand = command.trim()
+	if (!trimmedCommand) {
+		throw new Error('[MCP] stdio 模式命令不能为空')
+	}
+
+	// 按空格分割命令和参数（支持引号包裹的参数）
+	const parts: string[] = []
+	let current = ''
+	let inQuotes = false
+	let quoteChar = ''
+
+	for (let i = 0; i < trimmedCommand.length; i++) {
+		const char = trimmedCommand[i]
+
+		if ((char === '"' || char === "'") && !inQuotes) {
+			inQuotes = true
+			quoteChar = char
+		} else if (char === quoteChar && inQuotes) {
+			inQuotes = false
+			quoteChar = ''
+		} else if (char === ' ' && !inQuotes) {
+			if (current) {
+				parts.push(current)
+				current = ''
+			}
+		} else {
+			current += char
+		}
+	}
+
+	if (current) {
+		parts.push(current)
+	}
+
+	if (parts.length === 0) {
+		throw new Error('[MCP] stdio 模式命令解析失败')
+	}
+
+	const executable = parts[0]
+	const args = parts.slice(1)
+
+	// 解析环境变量
+	let parsedEnv: Record<string, string> = {}
+	try {
+		parsedEnv = typeof env === 'string' ? JSON.parse(env) : typeof env === 'object' ? env : {}
+	} catch (e) {
+		console.warn('[MCP] env 解析失败，使用空对象', e)
+		parsedEnv = {}
+	}
+
+	return {
+		command: executable,
+		args,
+		env: parsedEnv
+	}
+}
+
+// ───── 主入口：初始化 MCP 客户端（支持 streamable-http 和 stdio 两种模式） ──────────────────────────────────
 export async function initMcpClient(transportConfig: Record<string, any>): Promise<{
 	mcpClient: McpClient
 	mcpTools: Tool[]
 }> {
-	const url = (transportConfig.url || '').toString().trim()
-	if (!url) throw new Error('[MCP] URL 不能为空')
+	// 获取连接类型，默认为 streamable-http
+	const connectionType = transportConfig.connectionType || 'streamable-http'
 
 	if (isConnecting) {
 		console.log('[MCP] 已有连接正在进行中，等待 1 秒...')
@@ -62,13 +129,26 @@ export async function initMcpClient(transportConfig: Record<string, any>): Promi
 	isConnecting = true
 	lastConnectionAttempt = now
 
-	const options = buildTransportOptions(transportConfig)
-	const targetUrl = new URL(url)
+	const mcpClient = new McpClient({ name: 'speed-ai', version: '0.1.0' })
 
 	try {
-		const mcpClient = new McpClient({ name: 'speed-ai', version: '0.1.0' })
-		const transport = new StreamableHTTPClientTransport(targetUrl, options)
-		console.log(`[MCP] 尝试连接 → ${url}`)
+		let transport: any
+
+		if (connectionType === 'stdio') {
+			// stdio 模式：通过本地进程启动 MCP 服务
+			const stdioOptions = buildStdioTransportOptions(transportConfig)
+			console.log(`[MCP] 尝试 stdio 连接 → ${stdioOptions.command} ${stdioOptions.args.join(' ')}`)
+			transport = new StdioClientTransport(stdioOptions)
+		} else {
+			// streamable-http 模式：通过 HTTP 远程连接
+			const url = (transportConfig.url || '').toString().trim()
+			if (!url) throw new Error('[MCP] streamable-http 模式 URL 不能为空')
+
+			const httpOptions = buildHttpTransportOptions(transportConfig)
+			const targetUrl = new URL(url)
+			console.log(`[MCP] 尝试 streamable-http 连接 → ${url}`)
+			transport = new StreamableHTTPClientTransport(targetUrl, httpOptions)
+		}
 
 		await mcpClient.connect(transport)
 		const { tools } = await mcpClient.listTools()
@@ -84,6 +164,18 @@ export async function initMcpClient(transportConfig: Record<string, any>): Promi
 		const errMsg = (e as Error)?.message || String(e) || '未知错误'
 		console.warn(`[MCP] ❌ 连接失败: ${errMsg}`)
 
+		// stdio 模式错误处理
+		if (connectionType === 'stdio') {
+			if (errMsg.includes('ENOENT') || errMsg.includes('not found')) {
+				throw new Error(`[MCP stdio 连接失败] 命令未找到，请检查 command 是否正确: ${errMsg}`)
+			}
+			if (errMsg.includes('EACCES') || errMsg.includes('permission denied')) {
+				throw new Error(`[MCP stdio 连接失败] 权限不足，请检查命令执行权限: ${errMsg}`)
+			}
+			throw new Error(`[MCP stdio 连接失败] ${errMsg}（排查：command / args / env / 依赖是否安装）`)
+		}
+
+		// streamable-http 模式错误处理
 		if (errMsg.includes('401') || errMsg.includes('403')) {
 			throw new Error('[MCP 认证失败] 服务器返回 401/403，请检查 accessToken / 认证方式 / useOAuth')
 		}
@@ -106,15 +198,20 @@ export async function initMcpClient(transportConfig: Record<string, any>): Promi
 
 // ───── 工具获取接口（带缓存） ───────────────────────────────────────
 export async function getTools(params: McpTool): Promise<Tool[]> {
-	const key = 'mcp_tools_' + params.url
-	const cachedTools = getFromCache<Tool[]>(key)
+	// 根据连接类型生成不同的缓存 key
+	const connectionType = params.connectionType || 'streamable-http'
+	const cacheKey = connectionType === 'stdio'
+		? `mcp_tools_stdio_${params.command}`
+		: `mcp_tools_${params.url}`
+
+	const cachedTools = getFromCache<Tool[]>(cacheKey)
 	if (cachedTools && Array.isArray(cachedTools) && cachedTools.length > 0) return cachedTools
 
 	let toolClient: McpClient | null = null
 	try {
 		const { mcpClient, mcpTools } = await initMcpClient({ ...params })
 		toolClient = mcpClient
-		addToCache(key, mcpTools)
+		addToCache(cacheKey, mcpTools)
 		return mcpTools
 	} catch (error) {
 		console.error('[MCP] 获取工具失败:', error)

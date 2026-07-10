@@ -44,7 +44,7 @@ const KnowledgeModel: React.FC<any> = () => {
 	const [currentPage, setCurrentPage] = useState<number>(1)
 	const [totalPages, setTotalPages] = useState<number>(1)
 	const [total, setTotal] = useState<number>(0)
-	
+
 	const [loading, setLoading] = useState<boolean>(false)
 
 	// 打开知识库管理弹窗时，刷新权限状态
@@ -275,7 +275,9 @@ const KnowledgeModel: React.FC<any> = () => {
 							description: knowledgeData.description,
 							content: knowledgeData.content,
 							updatedAt: new Date().toISOString()
-						}
+						},
+						showGlobalLoading: true,
+						loadingText: '正在保存...'
 					})
 					const { success, error } = await resp.json()
 					if (success) {
@@ -296,7 +298,9 @@ const KnowledgeModel: React.FC<any> = () => {
 							tags: knowledgeData.tags,
 							description: knowledgeData.description,
 							content: knowledgeData.content
-						}
+						},
+						showGlobalLoading: true,
+						loadingText: '正在保存...'
 					})
 					const { data } = await resp.json()
 					if (data?.id) {
@@ -329,7 +333,10 @@ const KnowledgeModel: React.FC<any> = () => {
 							onClose()
 							return
 						}
-						const resp = await apiFetch(`/api/knowledge?id=${encodeURIComponent(knowledgeData.id)}`, 'DELETE')
+						const resp = await apiFetch(`/api/knowledge?id=${encodeURIComponent(knowledgeData.id)}`, 'DELETE', {
+							showGlobalLoading: true,
+							loadingText: '正在删除...'
+						})
 						const { success, error } = await resp.json()
 						if (success) {
 							toast.success('删除成功')
@@ -492,7 +499,10 @@ const KnowledgeModel: React.FC<any> = () => {
 						fetchLocalKnowledgeList(1)
 						return
 					}
-					const resp = await apiFetch('/api/knowledge?clear=true', 'DELETE')
+					const resp = await apiFetch('/api/knowledge?clear=true', 'DELETE', {
+						showGlobalLoading: true,
+						loadingText: '正在清空...'
+					})
 					const { success, error } = await resp.json()
 					if (success) {
 						toast.success('清空成功')
