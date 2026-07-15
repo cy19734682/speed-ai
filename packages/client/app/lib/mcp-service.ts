@@ -108,10 +108,29 @@ function buildStdioTransportOptions(transportConfig: Record<string, any>): any {
 	}
 }
 
+/**
+ * 提取请求超时配置，未设置时使用默认值 60000ms (60秒)
+ * 注意：SDK 默认超时也是 60 秒，此函数允许覆盖
+ */
+function getRequestTimeout(transportConfig: Record<string, any>): number {
+	return Number(transportConfig.requestTimeout) || 60000
+}
+
+/**
+ * 生成超时错误的友好提示信息
+ */
+function buildTimeoutSuggestion(connectionType: string, timeoutSec: number): string {
+	if (connectionType === 'stdio') {
+		return `当前超时 ${timeoutSec}s，建议：1. 检查 MCP 服务命令是否正确、依赖是否已安装 2. 在配置中将 requestTimeout 调大（如 120000）3. 确认本地进程能正常启动并响应`
+	}
+	return `当前超时 ${timeoutSec}s，建议：1. 在工具配置中将 requestTimeout 调大（如 120000 = 2分钟）2. 检查 MCP 服务器是否正常响应 3. 检查网络连接及防火墙 4. 确认 URL 为正确的 MCP 端点`
+}
+
 // ───── 主入口：初始化 MCP 客户端（支持 streamable-http 和 stdio 两种模式） ──────────────────────────────────
 export async function initMcpClient(transportConfig: Record<string, any>): Promise<{
 	mcpClient: McpClient
 	mcpTools: Tool[]
+	requestTimeout: number
 }> {
 	// 获取连接类型，默认为 streamable-http
 	const connectionType = transportConfig.connectionType || 'streamable-http'
@@ -129,6 +148,10 @@ export async function initMcpClient(transportConfig: Record<string, any>): Promi
 	isConnecting = true
 	lastConnectionAttempt = now
 
+	// 从配置中提取超时时间（毫秒），默认 60 秒
+	const requestTimeout = getRequestTimeout(transportConfig)
+
+	// 注意：ProtocolOptions 不支持 requestTimeout，超时必须通过每个请求的 RequestOptions 传递
 	const mcpClient = new McpClient({ name: 'speed-ai', version: '0.1.0' })
 
 	try {
@@ -150,8 +173,10 @@ export async function initMcpClient(transportConfig: Record<string, any>): Promi
 			transport = new StreamableHTTPClientTransport(targetUrl, httpOptions)
 		}
 
-		await mcpClient.connect(transport)
-		const { tools } = await mcpClient.listTools()
+		await mcpClient.connect(transport, { timeout: requestTimeout })
+
+		const { tools } = await mcpClient.listTools(undefined, { timeout: requestTimeout })
+
 		const mcpTools: Tool[] = tools.map((tool: any) => ({
 			name: tool.name,
 			description: tool.description || '',
@@ -159,10 +184,15 @@ export async function initMcpClient(transportConfig: Record<string, any>): Promi
 		}))
 
 		console.log(`[MCP] ✅ 连接成功，工具数量: ${mcpTools.length}`)
-		return { mcpClient, mcpTools }
+		return { mcpClient, mcpTools, requestTimeout }
 	} catch (e) {
 		const errMsg = (e as Error)?.message || String(e) || '未知错误'
 		console.warn(`[MCP] ❌ 连接失败: ${errMsg}`)
+
+		// 超时错误处理（MCP error -32001: Request timed out）
+		if (errMsg.includes('-32001') || errMsg.includes('timed out') || errMsg.includes('timeout')) {
+			throw new Error(`[MCP 请求超时] ${errMsg}（${buildTimeoutSuggestion(connectionType, requestTimeout / 1000)}）`)
+		}
 
 		// stdio 模式错误处理
 		if (connectionType === 'stdio') {
@@ -200,9 +230,7 @@ export async function initMcpClient(transportConfig: Record<string, any>): Promi
 export async function getTools(params: McpTool): Promise<Tool[]> {
 	// 根据连接类型生成不同的缓存 key
 	const connectionType = params.connectionType || 'streamable-http'
-	const cacheKey = connectionType === 'stdio'
-		? `mcp_tools_stdio_${params.command}`
-		: `mcp_tools_${params.url}`
+	const cacheKey = connectionType === 'stdio' ? `mcp_tools_stdio_${params.command}` : `mcp_tools_${params.url}`
 
 	const cachedTools = getFromCache<Tool[]>(cacheKey)
 	if (cachedTools && Array.isArray(cachedTools) && cachedTools.length > 0) return cachedTools

@@ -99,9 +99,10 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 	// 处理MCP工具
 	let funcTools: any[] = []
 	for (const tool of tools) {
-		const { mcpClient, mcpTools } = await initMcpClient(tool)
+		const { mcpClient, mcpTools, requestTimeout } = await initMcpClient(tool)
 		tool.mcpClient = mcpClient
 		tool.mcpTools = mcpTools
+		tool.requestTimeout = requestTimeout // 保存超时供后续 callTool 使用
 		funcTools.push(...mcpTools)
 	}
 	if (funcTools?.length > 0) {
@@ -236,24 +237,70 @@ export const createDeepSeekChatStream = async (messages: any, options: Record<st
 					// 开始调用MCP工具
 					controller.enqueue(replyFormat('tools', { index: round, content: outputTools }))
 				}
-				const retData = await mcpTool.mcpClient.callTool({
-					name,
-					arguments: argument
-				})
-				messages.push({
-					role: 'tool',
-					tool_call_id: id,
-					content: JSON.stringify(retData)
-				})
-				const endTool: any = { type: 'end', toolName, params: argument, result: retData }
-				if (searchTool?.tool?.split(',').includes(name)) {
-					// 结束调用联网搜索并向前端输入结果
-					endTool.result = JSON.parse(retData.content?.[0]?.text || '[]')
-					controller.enqueue(replyFormat('search', { index: round, content: endTool }))
-				} else {
-					outputTools[outputTools.length - 1] = endTool
-					// 结束调用MCP工具
-					controller.enqueue(replyFormat('tools', { index: round, content: outputTools }))
+				try {
+					// ✅ 关键修复：通过 RequestOptions.timeout 传递请求超时，解决 McpError -32001
+					const requestTimeout = mcpTool?.requestTimeout || 60_000
+					const retData = await mcpTool.mcpClient.callTool(
+						{
+							name,
+							arguments: argument
+						},
+						undefined, // resultSchema 可选
+						{ timeout: requestTimeout } // RequestOptions
+					)
+					messages.push({
+						role: 'tool',
+						tool_call_id: id,
+						content: JSON.stringify(retData)
+					})
+					const endTool: any = { type: 'end', toolName, params: argument, result: retData }
+					if (searchTool?.tool?.split(',').includes(name)) {
+						// 结束调用联网搜索并向前端输入结果
+						endTool.result = JSON.parse(retData.content?.[0]?.text || '[]')
+						controller.enqueue(replyFormat('search', { index: round, content: endTool }))
+					} else {
+						outputTools[outputTools.length - 1] = endTool
+						// 结束调用MCP工具
+						controller.enqueue(replyFormat('tools', { index: round, content: outputTools }))
+					}
+				} catch (toolErr) {
+					const toolErrMsg = (toolErr as Error)?.message || String(toolErr) || '工具调用失败'
+					console.error(`[MCP 工具调用失败] ${toolName}:`, toolErr)
+
+					// 超时错误（MCP error -32001: Request timed out）
+					if (toolErrMsg.includes('-32001') || toolErrMsg.includes('timed out') || toolErrMsg.includes('timeout')) {
+						const currentTimeout = Math.round((mcpTool?.requestTimeout || 60_000) / 1000)
+						const failTool = {
+							type: 'error',
+							toolName,
+							error: `请求超时（当前${currentTimeout}s）请在 MCP 工具配置中调大 requestTimeout`
+						}
+						if (searchTool?.tool?.split(',').includes(name)) {
+							controller.enqueue(replyFormat('search', { index: round, content: failTool }))
+						} else {
+							outputTools[outputTools.length - 1] = failTool
+							controller.enqueue(replyFormat('tools', { index: round, content: outputTools }))
+						}
+						messages.push({
+							role: 'tool',
+							tool_call_id: id,
+							content: JSON.stringify({ isError: true, error: `工具调用超时，请重试：${toolErrMsg}` })
+						})
+					} else {
+						// 其他错误
+						const failTool = { type: 'error', toolName, error: toolErrMsg }
+						if (searchTool?.tool?.split(',').includes(name)) {
+							controller.enqueue(replyFormat('search', { index: round, content: failTool }))
+						} else {
+							outputTools[outputTools.length - 1] = failTool
+							controller.enqueue(replyFormat('tools', { index: round, content: outputTools }))
+						}
+						messages.push({
+							role: 'tool',
+							tool_call_id: id,
+							content: JSON.stringify({ isError: true, error: toolErrMsg })
+						})
+					}
 				}
 			}
 			round++

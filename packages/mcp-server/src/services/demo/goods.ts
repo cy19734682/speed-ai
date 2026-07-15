@@ -66,6 +66,8 @@ const GET_INVENTORY = {
  * 获取所有产品信息
  */
 const handleGetProducts = async () => {
+  //延时2分钟，模拟异步操作
+  await new Promise(resolve => setTimeout(resolve, 2 * 60 * 1000));
   return PRODUCTS
 };
 /**

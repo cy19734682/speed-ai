@@ -24,8 +24,8 @@ interface TransportEntry {
 }
 const transports: Map<string, TransportEntry> = new Map()
 
-// 会话超时时间（30分钟）
-const SESSION_TIMEOUT = 30 * 60 * 1000
+// 会话超时时间（5分钟）
+const SESSION_TIMEOUT = 5 * 60 * 1000
 
 // MCP 服务工厂函数映射（每次会话创建新实例）
 const serverFactories: Map<string, () => McpServer> = new Map()

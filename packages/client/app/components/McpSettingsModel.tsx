@@ -21,7 +21,8 @@ const initialData = {
 	enabled: false,
 	connectionType: 'streamable-http' as 'streamable-http' | 'stdio',
 	command: '',
-	env: ''
+	env: '',
+	requestTimeout: 60000 // 默认 60 秒（毫秒）
 }
 
 /**
@@ -96,7 +97,10 @@ const McpSettingsModel: React.FC<any> = () => {
 
 		useEffect(() => {
 			if (item && isOpen) {
-				setMcpTool(item)
+				setMcpTool({
+					...item,
+					requestTimeout: item?.requestTimeout || 60000 // 兼容旧数据，默认 60 秒
+				})
 				setChildTools([])
 				setEnvVars(parseEnvVars(item?.env || ''))
 			}
@@ -402,6 +406,22 @@ const McpSettingsModel: React.FC<any> = () => {
 								</label>
 							</>
 						)}
+
+						<label className="block">
+							<span className="block font-semibold mb-2">请求超时（毫秒）</span>
+							<input
+								type="number"
+								className="bg-white w-full border border-gray-300 rounded-md py-2 px-3"
+								placeholder="如 60000 = 60 秒，120000 = 2 分钟"
+								min={1000}
+								step={1000}
+								value={mcpTool?.requestTimeout || 60000}
+								onChange={(e) => handleChange('requestTimeout', parseInt(e.target.value, 10) || 60000)}
+							/>
+							<span className="text-xs text-gray-500 block mt-1">
+								默认 60000（60 秒），慢速工具建议设置 120000（2 分钟）或更大
+							</span>
+						</label>
 
 						<label className="block">
 							<span className="block font-semibold mb-2">描述</span>
