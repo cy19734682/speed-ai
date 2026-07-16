@@ -54,6 +54,19 @@ export default function useChatContent() {
 	}, [])
 
 	/**
+	 * 动态更新浏览器标签页标题
+	 * - 当存在对话且有有效标题时，展示对话标题
+	 * - 否则使用默认标题
+	 */
+	useEffect(() => {
+		if (typeof document !== 'undefined') {
+			const defaultTitle = 'Speed AI - 智能助手'
+			const chatTitle = currentChatData?.title?.trim()
+			document.title = chatTitle ? `${chatTitle} - Speed AI` : defaultTitle
+		}
+	}, [currentChatData])
+
+	/**
 	 * 当前角色ID变化时新建会话并将AI助手加入对话中
 	 */
 	useEffect(() => {

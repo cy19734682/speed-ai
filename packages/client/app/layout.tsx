@@ -6,8 +6,8 @@ import GlobalLoading from '@/app/components/commons/GlobalLoading'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'AI 客户端',
-  description: '大模型上下文协议客户端界面',
+  title: 'Speed AI - 智能助手',
+  description: 'Speed AI 是一个基于大模型的智能助手，提供快速、准确、智能的对话服务。',
 }
 
 export default function RootLayout({
